@@ -30,6 +30,12 @@ import {
   handleDisconnect,
   listSessionsTool,
   handleListSessions,
+  sftpUploadTool,
+  handleSftpUpload,
+  sftpDownloadTool,
+  handleSftpDownload,
+  sftpListTool,
+  handleSftpList,
 } from './tools/index.js';
 
 export function createServer(storage?: StorageManager) {
@@ -61,6 +67,9 @@ export function createServer(storage?: StorageManager) {
       interruptTool,
       disconnectTool,
       listSessionsTool,
+      sftpUploadTool,
+      sftpDownloadTool,
+      sftpListTool,
     ],
   }));
 
@@ -106,6 +115,15 @@ export function createServer(storage?: StorageManager) {
         }
         case 'list_sessions': {
           return await handleListSessions(sessionManager);
+        }
+        case 'sftp_upload': {
+          return await handleSftpUpload(args, sessionManager, sshManager);
+        }
+        case 'sftp_download': {
+          return await handleSftpDownload(args, sessionManager, sshManager);
+        }
+        case 'sftp_list': {
+          return await handleSftpList(args, sessionManager, sshManager);
         }
         default: {
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

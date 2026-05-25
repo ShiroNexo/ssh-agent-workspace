@@ -1,5 +1,35 @@
-import { Client, type ConnectConfig } from 'ssh2';
+import { Client, type ConnectConfig, SFTPWrapper } from 'ssh2';
+import fs from 'fs';
+import path from 'path';
 import { logger } from '../utils/logger.js';
+
+export interface SFTPEntry {
+  filename: string;
+  longname: string;
+  attrs: {
+    mode: number;
+    uid: number;
+    gid: number;
+    size: number;
+    atime: number;
+    mtime: number;
+    isDirectory: boolean;
+    isFile: boolean;
+    isSymbolicLink: boolean;
+  };
+}
+
+export interface SFTPStat {
+  mode: number;
+  uid: number;
+  gid: number;
+  size: number;
+  atime: number;
+  mtime: number;
+  isDirectory: boolean;
+  isFile: boolean;
+  isSymbolicLink: boolean;
+}
 
 export class SSHManager {
   async connect(config: ConnectConfig): Promise<Client> {
@@ -34,6 +64,215 @@ export class SSHManager {
       });
 
       client.connect(config);
+    });
+  }
+
+  private getSftp(ssh: Client, timeoutMs = 30000): Promise<SFTPWrapper> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP session timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      ssh.sftp((err, sftp) => {
+        clearTimeout(timer);
+        if (err) return reject(err);
+        resolve(sftp);
+      });
+    });
+  }
+
+  async sftpUpload(
+    ssh: Client,
+    localPath: string,
+    remotePath: string,
+    timeoutMs = 300000
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP upload timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.fastPut(localPath, remotePath, (err) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          logger.info({ localPath, remotePath }, 'SFTP upload complete');
+          resolve();
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  }
+
+  async sftpDownload(
+    ssh: Client,
+    remotePath: string,
+    localPath: string,
+    timeoutMs = 300000
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP download timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.fastGet(remotePath, localPath, (err) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          logger.info({ remotePath, localPath }, 'SFTP download complete');
+          resolve();
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  }
+
+  async sftpList(
+    ssh: Client,
+    remotePath: string,
+    timeoutMs = 30000
+  ): Promise<SFTPEntry[]> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP list timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.readdir(remotePath, (err, entries) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          const result: SFTPEntry[] = (entries as Array<{
+            filename: string;
+            longname: string;
+            attrs: {
+              mode: number; size: number; uid: number; gid: number;
+              atime: number; mtime: number;
+            };
+          }>).map((entry) => ({
+            filename: entry.filename,
+            longname: entry.longname,
+            attrs: {
+              mode: entry.attrs.mode,
+              uid: entry.attrs.uid,
+              gid: entry.attrs.gid,
+              size: entry.attrs.size,
+              atime: entry.attrs.atime,
+              mtime: entry.attrs.mtime,
+              isDirectory: (entry.attrs.mode & 0o40000) !== 0,
+              isFile: (entry.attrs.mode & 0o100000) !== 0,
+              isSymbolicLink: (entry.attrs.mode & 0o120000) !== 0,
+            },
+          }));
+          resolve(result);
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  }
+
+  async sftpStat(
+    ssh: Client,
+    remotePath: string,
+    timeoutMs = 15000
+  ): Promise<SFTPStat> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP stat timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.stat(remotePath, (err, stats) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          resolve({
+            mode: stats.mode,
+            uid: stats.uid,
+            gid: stats.gid,
+            size: stats.size,
+            atime: stats.atime,
+            mtime: stats.mtime,
+            isDirectory: (stats.mode & 0o40000) !== 0,
+            isFile: (stats.mode & 0o100000) !== 0,
+            isSymbolicLink: (stats.mode & 0o120000) !== 0,
+          });
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  }
+
+  async sftpExists(
+    ssh: Client,
+    remotePath: string,
+    timeoutMs = 15000
+  ): Promise<boolean> {
+    try {
+      await this.sftpStat(ssh, remotePath, timeoutMs);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async sftpMkdir(
+    ssh: Client,
+    remotePath: string,
+    timeoutMs = 15000
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP mkdir timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.mkdir(remotePath, {}, (err) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          logger.info({ remotePath }, 'SFTP directory created');
+          resolve();
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  }
+
+  async sftpUnlink(
+    ssh: Client,
+    remotePath: string,
+    timeoutMs = 15000
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`SFTP unlink timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        const sftp = await this.getSftp(ssh);
+        sftp.unlink(remotePath, (err) => {
+          clearTimeout(timer);
+          if (err) return reject(err);
+          logger.info({ remotePath }, 'SFTP file deleted');
+          resolve();
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
     });
   }
 

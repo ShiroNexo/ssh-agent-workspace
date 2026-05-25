@@ -7,3 +7,6 @@ export { execTool, handleExec } from './exec.js';
 export { interruptTool, handleInterrupt } from './interrupt.js';
 export { disconnectTool, handleDisconnect } from './disconnect.js';
 export { listSessionsTool, handleListSessions } from './list_sessions.js';
+export { sftpUploadTool, handleSftpUpload } from './sftp_upload.js';
+export { sftpDownloadTool, handleSftpDownload } from './sftp_download.js';
+export { sftpListTool, handleSftpList } from './sftp_list.js';
