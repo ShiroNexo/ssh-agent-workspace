@@ -72,6 +72,8 @@ export class SessionManager {
       return false;
     }
 
+    session.ssh.removeAllListeners('close');
+
     try {
       session.ssh.destroy();
     } catch (err) {
@@ -89,6 +91,7 @@ export class SessionManager {
 
   disconnectAll(): void {
     for (const [id, session] of this.sessions) {
+      session.ssh.removeAllListeners('close');
       try {
         session.ssh.destroy();
       } catch (err) {

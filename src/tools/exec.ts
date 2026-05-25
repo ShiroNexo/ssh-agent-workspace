@@ -182,6 +182,7 @@ export async function handleExec(
   let stabilized = false;
 
   while (elapsed < max_wait_ms) {
+    let captureFailed = false;
     try {
       output = await tmuxManager.capturePane(
         session.ssh,
@@ -189,22 +190,14 @@ export async function handleExec(
         lines
       );
     } catch (err) {
-      logger.error(
-        { sessionId: session_id, error: (err as Error).message },
-        'Failed to capture output during stabilization'
+      captureFailed = true;
+      logger.warn(
+        { sessionId: session_id, error: (err as Error).message, attempt: Math.floor(elapsed / pollInterval) },
+        'capturePane failed, retrying'
       );
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Error: Failed to capture output: ${(err as Error).message}`,
-          },
-        ],
-        isError: true,
-      };
     }
 
-    if (outputContainsPrompt(output)) {
+    if (!captureFailed && outputContainsPrompt(output)) {
       stabilized = true;
       logger.info(
         { sessionId: session_id, elapsedMs: elapsed },

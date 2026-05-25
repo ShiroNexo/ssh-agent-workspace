@@ -4,6 +4,10 @@ import { logger } from '../utils/logger.js';
 
 export const MCP_PROMPT = '__MCP_PROMPT__> ';
 
+function q(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 export class TmuxManager {
   private sshManager: SSHManager;
 
@@ -27,7 +31,7 @@ export class TmuxManager {
   ): Promise<void> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux new-session -A -s '${sessionName}' -d`
+      `tmux new-session -A -s ${q(sessionName)} -d`
     );
     if (result.code !== 0) {
       throw new Error(
@@ -38,15 +42,13 @@ export class TmuxManager {
   }
 
   async applyOptions(ssh: Client, sessionName: string): Promise<void> {
-    // Increase scrollback buffer for AI context recovery
     await this.sshManager.exec(
       ssh,
-      `tmux set-option -t '${sessionName}' history-limit 50000`
+      `tmux set-option -t ${q(sessionName)} history-limit 50000`
     );
-    // Disable mouse to avoid interfering with paste/send-keys
     await this.sshManager.exec(
       ssh,
-      `tmux set-option -t '${sessionName}' mouse off`
+      `tmux set-option -t ${q(sessionName)} mouse off`
     );
     logger.info({ sessionName }, 'Applied tmux options (history-limit=50000, mouse=off)');
   }
@@ -54,7 +56,7 @@ export class TmuxManager {
   async detectShell(ssh: Client, sessionName: string): Promise<string | null> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux display-message -t '${sessionName}' -p '#{pane_current_command}'`
+      `tmux display-message -t ${q(sessionName)} -p '#{pane_current_command}'`
     );
     if (result.code !== 0) {
       return null;
@@ -73,7 +75,7 @@ export class TmuxManager {
   async healthCheck(ssh: Client, sessionName: string): Promise<boolean> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux has-session -t '${sessionName}'`
+      `tmux has-session -t ${q(sessionName)}`
     );
     if (result.code !== 0) {
       logger.warn({ sessionName }, 'Tmux health check failed: session missing');
@@ -88,7 +90,7 @@ export class TmuxManager {
     input: string
   ): Promise<void> {
     const base64 = Buffer.from(input).toString('base64');
-    const command = `printf '%s' '${base64}' | base64 -d | tmux load-buffer - && tmux paste-buffer -t '${sessionName}' -d`;
+    const command = `printf '%s' ${q(base64)} | base64 -d | tmux load-buffer - && tmux paste-buffer -t ${q(sessionName)} -d`;
     const result = await this.sshManager.exec(ssh, command);
     if (result.code !== 0) {
       throw new Error(
@@ -103,7 +105,7 @@ export class TmuxManager {
     command: string
   ): Promise<void> {
     const base64 = Buffer.from(command + '\n').toString('base64');
-    const shellCommand = `printf '%s' '${base64}' | base64 -d | tmux load-buffer - && tmux paste-buffer -t '${sessionName}' -d`;
+    const shellCommand = `printf '%s' ${q(base64)} | base64 -d | tmux load-buffer - && tmux paste-buffer -t ${q(sessionName)} -d`;
     const result = await this.sshManager.exec(ssh, shellCommand);
     if (result.code !== 0) {
       throw new Error(
@@ -117,10 +119,10 @@ export class TmuxManager {
     sessionName: string,
     signal: 'SIGINT' | 'SIGTERM'
   ): Promise<void> {
-    const key = signal === 'SIGINT' ? 'C-c' : 'C-d';
+    const key = signal === 'SIGINT' ? 'C-c' : 'C-c';
     const result = await this.sshManager.exec(
       ssh,
-      `tmux send-keys -t '${sessionName}' ${key}`
+      `tmux send-keys -t ${q(sessionName)} ${key}`
     );
     if (result.code !== 0) {
       throw new Error(
@@ -137,7 +139,7 @@ export class TmuxManager {
   ): Promise<string> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux capture-pane -t '${sessionName}' -p -S -${lines}`
+      `tmux capture-pane -t ${q(sessionName)} -p -S -${lines}`
     );
     if (result.code !== 0) {
       throw new Error(
@@ -150,7 +152,7 @@ export class TmuxManager {
   async hasSession(ssh: Client, sessionName: string): Promise<boolean> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux has-session -t '${sessionName}'`
+      `tmux has-session -t ${q(sessionName)}`
     );
     return result.code === 0;
   }
@@ -169,7 +171,7 @@ export class TmuxManager {
   async killSession(ssh: Client, sessionName: string): Promise<void> {
     const result = await this.sshManager.exec(
       ssh,
-      `tmux kill-session -t '${sessionName}'`
+      `tmux kill-session -t ${q(sessionName)}`
     );
     if (result.code !== 0) {
       logger.warn(

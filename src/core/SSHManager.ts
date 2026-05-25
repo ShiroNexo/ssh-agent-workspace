@@ -39,7 +39,8 @@ export class SSHManager {
 
   async exec(
     ssh: Client,
-    command: string
+    command: string,
+    timeoutMs = 30000
   ): Promise<{
     stdout: string;
     stderr: string;
@@ -51,6 +52,11 @@ export class SSHManager {
         if (err) {
           return reject(err);
         }
+
+        const timer = setTimeout(() => {
+          stream.close();
+          reject(new Error(`Command timed out after ${timeoutMs}ms: ${command.slice(0, 80)}`));
+        }, timeoutMs);
 
         let stdout = '';
         let stderr = '';
@@ -64,10 +70,12 @@ export class SSHManager {
         });
 
         stream.on('close', (code: number | null, signal: string | null) => {
+          clearTimeout(timer);
           resolve({ stdout, stderr, code, signal });
         });
 
         stream.on('error', (err: Error) => {
+          clearTimeout(timer);
           reject(err);
         });
       });

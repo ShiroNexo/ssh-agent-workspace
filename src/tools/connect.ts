@@ -4,7 +4,7 @@ import os from 'os';
 import type { ConnectConfig } from 'ssh2';
 import { SessionManager } from '../core/SessionManager.js';
 import { SSHManager } from '../core/SSHManager.js';
-import { TmuxManager } from '../core/TmuxManager.js';
+import { TmuxManager, MCP_PROMPT } from '../core/TmuxManager.js';
 import { listHostAliases, getHostConfig } from '../utils/sshConfig.js';
 import { sanitizeTmuxSessionName } from '../utils/validation.js';
 import { isHostAllowed } from '../utils/security.js';
@@ -164,7 +164,7 @@ export async function handleConnect(
     };
   }
 
-  const tmuxSessionName = `mcp_${sanitizeTmuxSessionName(host)}_${uuidv4().slice(0, 8)}`;
+  const tmuxSessionName = `mcp_${sanitizeTmuxSessionName(host)}_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
 
   try {
     await tmuxManager.createOrAttachSession(ssh, tmuxSessionName);
@@ -194,22 +194,39 @@ export async function handleConnect(
 
   const supportedShells = ['bash', 'zsh'];
   if (shell && !supportedShells.includes(shell)) {
-    logger.warn({ host, shell }, 'Unsupported shell detected');
-    // We continue but warn; the prompt injection may not work reliably
+    try {
+      await tmuxManager.killSession(ssh, tmuxSessionName);
+    } catch {}
+    sshManager.disconnect(ssh);
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Unsupported shell '${shell}' on host '${host}'. Only bash and zsh are supported in V1.`,
+        },
+      ],
+      isError: true,
+    };
   }
 
-  // Inject deterministic prompt
-  try {
-    // Wait a moment for the shell to be ready
-    await new Promise((r) => setTimeout(r, 300));
-    await tmuxManager.injectPrompt(ssh, tmuxSessionName);
-    // Wait for prompt to take effect
-    await new Promise((r) => setTimeout(r, 200));
-  } catch (err) {
-    logger.warn(
-      { host, error: (err as Error).message },
-      'Failed to inject deterministic prompt'
-    );
+  // Inject deterministic prompt with retry + verification
+  let promptInjected = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      await tmuxManager.injectPrompt(ssh, tmuxSessionName);
+      await new Promise((r) => setTimeout(r, 300));
+      const output = await tmuxManager.capturePane(ssh, tmuxSessionName, 10);
+      if (output.includes(MCP_PROMPT)) {
+        promptInjected = true;
+        break;
+      }
+    } catch {
+      logger.warn({ host, attempt }, 'Prompt injection retry');
+    }
+  }
+  if (!promptInjected) {
+    logger.warn({ host }, 'Failed to inject deterministic prompt after retries, continuing');
   }
 
   // Apply tmux options for AI-friendly behavior

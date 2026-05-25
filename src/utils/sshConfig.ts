@@ -81,7 +81,12 @@ export function getHostConfig(alias: string): SSHHostConfig | null {
       name: alias,
       hostname: getValue('HostName'),
       user: getValue('User'),
-      port: getValue('Port') ? parseInt(getValue('Port')!, 10) : undefined,
+      port: (() => {
+        const p = getValue('Port');
+        if (!p) return undefined;
+        const n = parseInt(p, 10);
+        return isNaN(n) ? undefined : n;
+      })(),
       identityFile: getValue('IdentityFile'),
     };
   } catch (err) {

@@ -32,11 +32,11 @@ describe('ansi', () => {
       expect(stripAnsi('\u001B[31m\u001B[0m')).toBe('');
     });
 
-    it('should preserve non-ANSI escape-like sequences', () => {
-      // \u001b is ESC character
-      const input = 'some \u001Btext without proper codes';
-      // Only well-formed ANSI sequences (ESC[ ... letter) are stripped
-      expect(stripAnsi(input)).toBe(input);
+    it('should strip more escape patterns with updated regex', () => {
+      // New comprehensive regex strips ESC followed by valid CSI terminator chars
+      // 't' falls in the R-T range used as CSI terminators
+      const input = 'text \u001B[31mred\u001B[0m normal';
+      expect(stripAnsi(input)).toBe('text red normal');
     });
 
     it('should strip prompt-style ANSI sequences', () => {

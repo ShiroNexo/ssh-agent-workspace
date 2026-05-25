@@ -189,6 +189,7 @@ async function main() {
   // Graceful shutdown
   const cleanup = () => {
     logger.info('Shutting down...');
+    sessionManager.disconnectAll();
     storage.shutdown();
     server
       .close()

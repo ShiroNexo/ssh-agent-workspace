@@ -170,15 +170,24 @@ export async function handleReconnect(
     };
   }
 
-  // Inject deterministic prompt if it seems missing
-  try {
-    const output = await tmuxManager.capturePane(ssh, tmux_session, 5);
-    if (!output.includes(MCP_PROMPT)) {
+  // Inject deterministic prompt with retry + verification
+  let promptInjected = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await new Promise((r) => setTimeout(r, 300));
       await tmuxManager.injectPrompt(ssh, tmux_session);
       await new Promise((r) => setTimeout(r, 300));
+      const output = await tmuxManager.capturePane(ssh, tmux_session, 10);
+      if (output.includes(MCP_PROMPT)) {
+        promptInjected = true;
+        break;
+      }
+    } catch {
+      logger.warn({ host, tmux_session, attempt }, 'Prompt injection retry');
     }
-  } catch (err) {
-    logger.warn({ host, tmux_session, error: (err as Error).message }, 'Prompt check/inject failed');
+  }
+  if (!promptInjected) {
+    logger.warn({ host, tmux_session }, 'Failed to inject prompt after retries, continuing');
   }
 
   const session = sessionManager.create(host, ssh, tmux_session);

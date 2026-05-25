@@ -20,6 +20,9 @@ function createMockSsh() {
         listeners['close'].forEach((cb) => cb());
       }
     },
+    removeAllListeners: (event: string) => {
+      delete listeners[event];
+    },
     listeners,
   };
 }
