@@ -1,11 +1,9 @@
 import { z } from 'zod';
-import fs from 'fs';
-import os from 'os';
-import type { ConnectConfig } from 'ssh2';
 import { SessionManager } from '../core/SessionManager.js';
 import { SSHManager } from '../core/SSHManager.js';
 import { TmuxManager, MCP_PROMPT } from '../core/TmuxManager.js';
 import { listHostAliases, getHostConfig } from '../utils/sshConfig.js';
+import { buildSshConfig } from '../utils/ssh.js';
 import { isHostAllowed } from '../utils/security.js';
 import { logger } from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -95,35 +93,17 @@ export async function handleReconnect(
     };
   }
 
-  const sshConfig: ConnectConfig = {
-    host: hostConfig.hostname || host,
-    port: hostConfig.port || 22,
-    username: hostConfig.user || process.env.USER || 'root',
-    readyTimeout: 20000,
-    keepaliveInterval: 10000,
-    keepaliveCountMax: 3,
-  };
-
-  if (hostConfig.identityFile) {
-    const keyPath = hostConfig.identityFile.replace(/^~(?=$|\/)/, os.homedir());
-    if (fs.existsSync(keyPath)) {
-      try {
-        sshConfig.privateKey = fs.readFileSync(keyPath);
-      } catch (err) {
-        logger.error({ keyPath, error: (err as Error).message }, 'Failed to read SSH private key');
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: Failed to read SSH key at ${keyPath}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    } else {
-      logger.warn({ keyPath }, 'SSH private key not found, attempting connection without explicit key');
-    }
+  const sshConfig = buildSshConfig(hostConfig);
+  if (!sshConfig) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Failed to read SSH private key for '${host}'`,
+        },
+      ],
+      isError: true,
+    };
   }
 
   let ssh;

@@ -65,6 +65,13 @@ export async function handleSftpList(
     };
   }
 
+  if (!sshManager.isAlive(session.ssh)) {
+    return {
+      content: [{ type: 'text' as const, text: `Error: SSH connection for session '${session_id}' is dead. Reconnect with connect or reconnect_to_tmux.` }],
+      isError: true,
+    };
+  }
+
   try {
     const entries = await sshManager.sftpList(session.ssh, remotePath);
     // Sort: directories first, then by name

@@ -66,6 +66,13 @@ export async function handleSftpDownload(
     };
   }
 
+  if (!sshManager.isAlive(session.ssh)) {
+    return {
+      content: [{ type: 'text' as const, text: `Error: SSH connection for session '${session_id}' is dead. Reconnect with connect or reconnect_to_tmux.` }],
+      isError: true,
+    };
+  }
+
   // Resolve and validate local destination directory
   const resolvedLocal = path.resolve(local_path);
   const localDir = path.dirname(resolvedLocal);

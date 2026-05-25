@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import os from 'os';
-import type { ConnectConfig } from 'ssh2';
 import { createServer } from './server.js';
 import { StorageManager } from './core/StorageManager.js';
 import { SSHManager } from './core/SSHManager.js';
 import { TmuxManager, MCP_PROMPT } from './core/TmuxManager.js';
 import { listHostAliases, getHostConfig } from './utils/sshConfig.js';
+import { buildSshConfig } from './utils/ssh.js';
 import { isHostAllowed } from './utils/security.js';
 import { logger } from './utils/logger.js';
 
@@ -53,28 +51,10 @@ async function restoreSessions(
       continue;
     }
 
-    const baseSshConfig: ConnectConfig = {
-      host: hostConfig.hostname || host,
-      port: hostConfig.port || 22,
-      username: hostConfig.user || process.env.USER || 'root',
-      readyTimeout: 15000,
-      keepaliveInterval: 10000,
-      keepaliveCountMax: 3,
-    };
-
-    if (hostConfig.identityFile) {
-      const keyPath = hostConfig.identityFile.replace(
-        /^~(?=$|\/)/,
-        os.homedir()
-      );
-      if (fs.existsSync(keyPath)) {
-        try {
-          baseSshConfig.privateKey = fs.readFileSync(keyPath);
-        } catch {
-          logger.warn({ keyPath }, 'Failed to read key, skipping host');
-          continue;
-        }
-      }
+    const baseSshConfig = buildSshConfig(hostConfig, 15000);
+    if (!baseSshConfig) {
+      logger.warn({ host }, 'Skip restore: failed to build SSH config');
+      continue;
     }
 
     // First, connect temporarily to discover mcp_* tmux sessions
@@ -180,6 +160,16 @@ async function main() {
   const { server, sessionManager, transport } = createServer(storage);
   const sshManager = new SSHManager();
   const tmuxManager = new TmuxManager(sshManager);
+
+  // Prevent silent crashes from unhandled errors
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ error: err.message, stack: err.stack }, 'Uncaught exception');
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    logger.fatal({ error: (reason as Error)?.message || String(reason) }, 'Unhandled rejection');
+  });
 
   // Restore previous sessions on startup (fire-and-forget, doesn't block MCP)
   restoreSessions(storage, sshManager, tmuxManager, sessionManager).catch((err) => {

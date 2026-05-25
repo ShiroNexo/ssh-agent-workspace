@@ -276,6 +276,14 @@ export class SSHManager {
     });
   }
 
+  isAlive(ssh: Client): boolean {
+    try {
+      return !(ssh as any)._destroyed && !(ssh as any)._sock?.destroyed;
+    } catch {
+      return false;
+    }
+  }
+
   async exec(
     ssh: Client,
     command: string,
