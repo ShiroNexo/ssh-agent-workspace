@@ -1,0 +1,123 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
+} from '@modelcontextprotocol/sdk/types.js';
+import { SessionManager } from './core/SessionManager.js';
+import { SSHManager } from './core/SSHManager.js';
+import { TmuxManager } from './core/TmuxManager.js';
+import { logger } from './utils/logger.js';
+import {
+  listHostsTool,
+  handleListHosts,
+  connectTool,
+  handleConnect,
+  reconnectTool,
+  handleReconnect,
+  sendInputTool,
+  handleSendInput,
+  readOutputTool,
+  handleReadOutput,
+  execTool,
+  handleExec,
+  interruptTool,
+  handleInterrupt,
+  disconnectTool,
+  handleDisconnect,
+  listSessionsTool,
+  handleListSessions,
+} from './tools/index.js';
+
+export function createServer() {
+  const server = new Server(
+    {
+      name: 'dynamic-ssh-mcp',
+      version: '1.0.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  const sessionManager = new SessionManager();
+  const sshManager = new SSHManager();
+  const tmuxManager = new TmuxManager(sshManager);
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      listHostsTool,
+      connectTool,
+      reconnectTool,
+      sendInputTool,
+      readOutputTool,
+      execTool,
+      interruptTool,
+      disconnectTool,
+      listSessionsTool,
+    ],
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    logger.info({ tool: name }, 'Tool called');
+
+    try {
+      switch (name) {
+        case 'list_hosts': {
+          return await handleListHosts();
+        }
+        case 'connect': {
+          return await handleConnect(
+            args,
+            sessionManager,
+            sshManager,
+            tmuxManager
+          );
+        }
+        case 'reconnect_to_tmux': {
+          return await handleReconnect(
+            args,
+            sessionManager,
+            sshManager,
+            tmuxManager
+          );
+        }
+        case 'send_input': {
+          return await handleSendInput(args, sessionManager, tmuxManager);
+        }
+        case 'read_output': {
+          return await handleReadOutput(args, sessionManager, tmuxManager);
+        }
+        case 'exec': {
+          return await handleExec(args, sessionManager, tmuxManager);
+        }
+        case 'interrupt': {
+          return await handleInterrupt(args, sessionManager, tmuxManager);
+        }
+        case 'disconnect': {
+          return await handleDisconnect(args, sessionManager, tmuxManager);
+        }
+        case 'list_sessions': {
+          return await handleListSessions(sessionManager);
+        }
+        default: {
+          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ tool: name, error: message }, 'Unhandled tool error');
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Tool execution failed: ${message}`
+      );
+    }
+  });
+
+  return { server, sessionManager, transport: new StdioServerTransport() };
+}

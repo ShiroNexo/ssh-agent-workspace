@@ -1,0 +1,244 @@
+import { z } from 'zod';
+import fs from 'fs';
+import os from 'os';
+import type { ConnectConfig } from 'ssh2';
+import { SessionManager } from '../core/SessionManager.js';
+import { SSHManager } from '../core/SSHManager.js';
+import { TmuxManager } from '../core/TmuxManager.js';
+import { listHostAliases, getHostConfig } from '../utils/sshConfig.js';
+import { sanitizeTmuxSessionName } from '../utils/validation.js';
+import { isHostAllowed } from '../utils/security.js';
+import { logger } from '../utils/logger.js';
+import { v4 as uuidv4 } from 'uuid';
+
+export const connectSchema = z.object({
+  host: z.string().min(1).describe('SSH host alias from ~/.ssh/config'),
+});
+
+export const connectTool = {
+  name: 'connect',
+  description:
+    'Connect to a remote host via SSH and establish a persistent tmux-backed interactive shell session. Supports bash and zsh only.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      host: {
+        type: 'string',
+        description: 'SSH host alias from ~/.ssh/config',
+      },
+    },
+    required: ['host'],
+  },
+};
+
+export async function handleConnect(
+  args: unknown,
+  sessionManager: SessionManager,
+  sshManager: SSHManager,
+  tmuxManager: TmuxManager
+) {
+  const parsed = connectSchema.safeParse(args);
+  if (!parsed.success) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Invalid arguments: ${parsed.error.message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const { host } = parsed.data;
+
+  // Security: check host allowlist
+  if (!isHostAllowed(host)) {
+    logger.warn({ host }, 'Host rejected by allowlist');
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Host '${host}' is not in the allowed hosts list`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Validate host exists in SSH config
+  const aliases = listHostAliases();
+  if (!aliases.includes(host)) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Host alias '${host}' not found in SSH config.\nAvailable aliases: ${aliases.join(', ') || '(none)'}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const hostConfig = getHostConfig(host);
+  if (!hostConfig) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Failed to resolve SSH configuration for '${host}'`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const sshConfig: ConnectConfig = {
+    host: hostConfig.hostname || host,
+    port: hostConfig.port || 22,
+    username: hostConfig.user || process.env.USER || 'root',
+    readyTimeout: 20000,
+    keepaliveInterval: 10000,
+    keepaliveCountMax: 3,
+  };
+
+  if (hostConfig.identityFile) {
+    const keyPath = hostConfig.identityFile.replace(
+      /^~(?=$|\/)/,
+      os.homedir()
+    );
+    if (fs.existsSync(keyPath)) {
+      try {
+        sshConfig.privateKey = fs.readFileSync(keyPath);
+      } catch (err) {
+        logger.error(
+          { keyPath, error: (err as Error).message },
+          'Failed to read SSH private key'
+        );
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Error: Failed to read SSH key at ${keyPath}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } else {
+      logger.warn(
+        { keyPath },
+        'SSH private key not found, attempting connection without explicit key'
+      );
+    }
+  }
+
+  let ssh;
+  try {
+    ssh = await sshManager.connect(sshConfig);
+  } catch (err) {
+    logger.error({ host, error: (err as Error).message }, 'SSH connection failed');
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: SSH connection failed: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Check tmux is installed
+  const tmuxInstalled = await tmuxManager.isInstalled(ssh);
+  if (!tmuxInstalled) {
+    sshManager.disconnect(ssh);
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: tmux is not installed on host '${host}'. Please install tmux first.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const tmuxSessionName = `mcp_${sanitizeTmuxSessionName(host)}_${uuidv4().slice(0, 8)}`;
+
+  try {
+    await tmuxManager.createOrAttachSession(ssh, tmuxSessionName);
+  } catch (err) {
+    sshManager.disconnect(ssh);
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Failed to create tmux session: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Detect shell
+  let shell: string | null = null;
+  try {
+    shell = await tmuxManager.detectShell(ssh, tmuxSessionName);
+  } catch (err) {
+    logger.warn(
+      { host, error: (err as Error).message },
+      'Shell detection failed, continuing anyway'
+    );
+  }
+
+  const supportedShells = ['bash', 'zsh'];
+  if (shell && !supportedShells.includes(shell)) {
+    logger.warn({ host, shell }, 'Unsupported shell detected');
+    // We continue but warn; the prompt injection may not work reliably
+  }
+
+  // Inject deterministic prompt
+  try {
+    // Wait a moment for the shell to be ready
+    await new Promise((r) => setTimeout(r, 300));
+    await tmuxManager.injectPrompt(ssh, tmuxSessionName);
+    // Wait for prompt to take effect
+    await new Promise((r) => setTimeout(r, 200));
+  } catch (err) {
+    logger.warn(
+      { host, error: (err as Error).message },
+      'Failed to inject deterministic prompt'
+    );
+  }
+
+  // Apply tmux options for AI-friendly behavior
+  try {
+    await tmuxManager.applyOptions(ssh, tmuxSessionName);
+  } catch (err) {
+    logger.warn(
+      { host, tmuxSessionName, error: (err as Error).message },
+      'Failed to apply tmux options, continuing anyway'
+    );
+  }
+
+  const session = sessionManager.create(host, ssh, tmuxSessionName, shell || undefined);
+
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify(
+          {
+            session_id: session.id,
+            host: session.host,
+            tmux_session: session.tmuxSession,
+            shell: shell || 'unknown',
+          },
+          null,
+          2
+        ),
+      },
+    ],
+  };
+}
