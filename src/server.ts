@@ -9,6 +9,7 @@ import {
 import { SessionManager } from './core/SessionManager.js';
 import { SSHManager } from './core/SSHManager.js';
 import { TmuxManager } from './core/TmuxManager.js';
+import { StorageManager } from './core/StorageManager.js';
 import { logger } from './utils/logger.js';
 import {
   listHostsTool,
@@ -31,7 +32,8 @@ import {
   handleListSessions,
 } from './tools/index.js';
 
-export function createServer() {
+export function createServer(storage?: StorageManager) {
+  const storageManager = storage || new StorageManager();
   const server = new Server(
     {
       name: 'dynamic-ssh-mcp',
@@ -44,7 +46,7 @@ export function createServer() {
     }
   );
 
-  const sessionManager = new SessionManager();
+  const sessionManager = new SessionManager(storageManager);
   const sshManager = new SSHManager();
   const tmuxManager = new TmuxManager(sshManager);
 
@@ -119,5 +121,5 @@ export function createServer() {
     }
   });
 
-  return { server, sessionManager, transport: new StdioServerTransport() };
+  return { server, sessionManager, storageManager, transport: new StdioServerTransport() };
 }

@@ -201,7 +201,8 @@ If the MCP process restarts:
 
 - Existing tmux sessions **survive** on the remote host
 - The `reconnect_to_tmux` tool allows attaching to an old tmux session by name
-- The architecture is designed so future session restore (auto-reconnect to previous sessions) can be added without refactoring the core model
+- **Session restore (NEW):** On startup, the server automatically scans all configured hosts for `mcp_*` tmux sessions and reconnects to them. Session metadata is persisted to `~/.dynamic-ssh-mcp/sessions.json`.
+- Set `MCP_SSH_RESTORE_SESSIONS=false` to disable auto-restore.
 
 ---
 
@@ -750,6 +751,7 @@ your setup is complete 🎉
 | `MCP_SSH_READONLY` | Disable input sending and command execution | `true` |
 | `MCP_SSH_ALLOWED_HOSTS` | Comma-separated allowed host aliases (empty = all) | `prod,staging` |
 | `MCP_SSH_DENYLIST_COMMANDS` | Comma-separated command substrings to block | `rm -rf,shutdown,halt` |
+| `MCP_SSH_RESTORE_SESSIONS` | Auto-restore tmux sessions on startup (default: `true`) | `false` |
 
 ---
 
@@ -1224,7 +1226,7 @@ npm run build
 
 ```
 src/
-  index.ts              # Entry point
+  index.ts              # Entry point + session restore
   server.ts             # MCP server setup
   types/
     index.ts            # Shared TypeScript types
@@ -1232,6 +1234,7 @@ src/
     SessionManager.ts   # Session lifecycle registry
     SSHManager.ts       # SSH connection management
     TmuxManager.ts      # tmux operations over SSH
+    StorageManager.ts   # Persistent session metadata (JSON)
   tools/
     index.ts            # Tool exports
     list_hosts.ts
@@ -1263,7 +1266,6 @@ src/
 - **tmux multi-window / pane management** — window creation and pane splits
 - **Terminal emulation** — proper ANSI/VT100 emulation for rich output
 - **AI memory per host** — host-specific context and preferences
-- **Session restore** — automatic reconnect to previous tmux sessions on startup
 - **Remote agent deployment** — deploy helper scripts to remote hosts
 - **Persistent storage** — SQLite/Redis backend for session metadata
 

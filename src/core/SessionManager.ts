@@ -1,23 +1,31 @@
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
+import { StorageManager } from './StorageManager.js';
 import type { Session } from '../types/index.js';
 
 export class SessionManager {
   private sessions = new Map<string, Session>();
+  private storage: StorageManager;
+
+  constructor(storage: StorageManager) {
+    this.storage = storage;
+  }
 
   create(
     host: string,
     ssh: Session['ssh'],
     tmuxSession: string,
-    shell?: string
+    shell?: string,
+    existingId?: string
   ): Session {
-    const id = `sess_${uuidv4().replace(/-/g, '')}`;
+    const id = existingId || `sess_${uuidv4().replace(/-/g, '')}`;
+    const now = Date.now();
     const session: Session = {
       id,
       host,
       ssh,
-      connectedAt: Date.now(),
-      lastActivity: Date.now(),
+      connectedAt: now,
+      lastActivity: now,
       tmuxSession,
       shell,
     };
@@ -27,6 +35,7 @@ export class SessionManager {
     ssh.on('close', () => {
       logger.info({ sessionId: id, host }, 'SSH connection closed, removing session');
       this.sessions.delete(id);
+      this.storage.remove(id);
     });
 
     ssh.on('error', (err) => {
@@ -34,6 +43,15 @@ export class SessionManager {
         { sessionId: id, error: err.message },
         'SSH connection error'
       );
+    });
+
+    this.storage.save({
+      id,
+      host,
+      tmuxSession,
+      shell,
+      connectedAt: now,
+      lastActivity: now,
     });
 
     logger.info({ sessionId: id, host, tmuxSession, shell }, 'Session created');
@@ -64,6 +82,7 @@ export class SessionManager {
     }
 
     this.sessions.delete(id);
+    this.storage.remove(id);
     logger.info({ sessionId: id }, 'Session removed');
     return true;
   }
@@ -78,6 +97,7 @@ export class SessionManager {
           'Error destroying SSH connection during cleanup'
         );
       }
+      this.storage.remove(id);
     }
     this.sessions.clear();
     logger.info('All sessions disconnected');
