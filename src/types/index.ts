@@ -18,4 +18,5 @@ export interface SSHHostConfig {
   user?: string;
   port?: number;
   identityFile?: string;
+  proxyJump?: string;
 }

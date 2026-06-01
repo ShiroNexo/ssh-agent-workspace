@@ -88,6 +88,7 @@ export function getHostConfig(alias: string): SSHHostConfig | null {
         return isNaN(n) ? undefined : n;
       })(),
       identityFile: getValue('IdentityFile'),
+      proxyJump: getValue('ProxyJump'),
     };
   } catch (err) {
     logger.error(

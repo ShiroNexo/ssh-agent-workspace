@@ -329,6 +329,57 @@ export class SSHManager {
     });
   }
 
+  async connectWithProxy(
+    proxyConfig: ConnectConfig,
+    targetConfig: ConnectConfig
+  ): Promise<Client> {
+    const proxy = await this.connect(proxyConfig);
+
+    let proxyStream;
+    try {
+      proxyStream = await new Promise<import('ssh2').ClientChannel>(
+        (resolve, reject) => {
+          const host = targetConfig.host || 'localhost';
+          const port = targetConfig.port || 22;
+          proxy.forwardOut('127.0.0.1', 0, String(host), port, (err, stream) => {
+            if (err) return reject(err);
+            resolve(stream);
+          });
+        }
+      );
+    } catch (err) {
+      proxy.destroy();
+      throw new Error(`Proxy forwardOut failed: ${(err as Error).message}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      const client = new Client();
+      const timeout = setTimeout(() => {
+        client.destroy();
+        reject(new Error(`SSH connection via proxy timeout to ${targetConfig.host}`));
+      }, 30000);
+
+      client.on('ready', () => {
+        clearTimeout(timeout);
+        logger.info({ host: targetConfig.host, via: proxyConfig.host }, 'SSH connection established via proxy');
+        resolve(client);
+      });
+
+      client.on('error', (err) => {
+        clearTimeout(timeout);
+        logger.error({ host: targetConfig.host, error: err.message }, 'SSH proxy connection error');
+        reject(err);
+      });
+
+      client.on('close', () => {
+        proxy.destroy();
+        logger.info({ host: targetConfig.host }, 'SSH proxy connection closed');
+      });
+
+      client.connect({ ...targetConfig, sock: proxyStream as any });
+    });
+  }
+
   disconnect(ssh: Client): void {
     try {
       ssh.destroy();

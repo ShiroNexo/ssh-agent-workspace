@@ -34,18 +34,6 @@ export async function handleSendInput(
   sessionManager: SessionManager,
   tmuxManager: TmuxManager
 ) {
-  if (isReadOnlyMode()) {
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: 'Error: Server is in read-only mode. Input sending is disabled.',
-        },
-      ],
-      isError: true,
-    };
-  }
-
   const parsed = sendInputSchema.safeParse(args);
   if (!parsed.success) {
     return {
@@ -68,6 +56,18 @@ export async function handleSendInput(
         {
           type: 'text' as const,
           text: `Error: Session '${session_id}' not found or has been disconnected`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (isReadOnlyMode(session.host)) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Host '${session.host}' is in read-only mode. Input sending is disabled.`,
         },
       ],
       isError: true,

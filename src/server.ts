@@ -10,6 +10,9 @@ import { SessionManager } from './core/SessionManager.js';
 import { SSHManager } from './core/SSHManager.js';
 import { TmuxManager } from './core/TmuxManager.js';
 import { StorageManager } from './core/StorageManager.js';
+import { ToolConfigManager } from './core/ToolConfigManager.js';
+import { HostSecurityManager } from './core/HostSecurityManager.js';
+import { setHostSecurityManager } from './utils/security.js';
 import { logger } from './utils/logger.js';
 import {
   listHostsTool,
@@ -36,7 +39,61 @@ import {
   handleSftpDownload,
   sftpListTool,
   handleSftpList,
+  connectionStatusTool,
+  handleConnectionStatus,
+  healthCheckTool,
+  handleHealthCheck,
+  tailLogTool,
+  handleTailLog,
+  tunnelOpenTool,
+  tunnelCloseTool,
+  tunnelListTool,
+  handleTunnelOpen,
+  handleTunnelClose,
+  handleTunnelList,
+  deployTool,
+  handleDeploy,
+  backupTool,
+  handleBackup,
+  syncTool,
+  handleSync,
+  groupExecTool,
+  handleGroupExec,
+  dbQueryTool,
+  handleDbQuery,
+  toolsConfigTool,
+  handleToolsConfig,
+  hostSecurityTool,
+  handleHostSecurity,
 } from './tools/index.js';
+
+const allTools = [
+  listHostsTool,
+  connectTool,
+  reconnectTool,
+  sendInputTool,
+  readOutputTool,
+  execTool,
+  interruptTool,
+  disconnectTool,
+  listSessionsTool,
+  sftpUploadTool,
+  sftpDownloadTool,
+  sftpListTool,
+  connectionStatusTool,
+  healthCheckTool,
+  tailLogTool,
+  tunnelOpenTool,
+  tunnelCloseTool,
+  tunnelListTool,
+  deployTool,
+  backupTool,
+  syncTool,
+  groupExecTool,
+  dbQueryTool,
+  toolsConfigTool,
+  hostSecurityTool,
+];
 
 export function createServer(storage?: StorageManager) {
   const storageManager = storage || new StorageManager();
@@ -55,22 +112,13 @@ export function createServer(storage?: StorageManager) {
   const sessionManager = new SessionManager(storageManager);
   const sshManager = new SSHManager();
   const tmuxManager = new TmuxManager(sshManager);
+  const toolConfigManager = new ToolConfigManager();
+  const hostSecurityManager = new HostSecurityManager();
+
+  setHostSecurityManager(hostSecurityManager);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      listHostsTool,
-      connectTool,
-      reconnectTool,
-      sendInputTool,
-      readOutputTool,
-      execTool,
-      interruptTool,
-      disconnectTool,
-      listSessionsTool,
-      sftpUploadTool,
-      sftpDownloadTool,
-      sftpListTool,
-    ],
+    tools: allTools.filter((t) => toolConfigManager.isEnabled(t.name)),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -124,6 +172,45 @@ export function createServer(storage?: StorageManager) {
         }
         case 'sftp_list': {
           return await handleSftpList(args, sessionManager, sshManager);
+        }
+        case 'connection_status': {
+          return await handleConnectionStatus(args, sessionManager, sshManager, tmuxManager);
+        }
+        case 'health_check': {
+          return await handleHealthCheck(args, sessionManager, sshManager);
+        }
+        case 'tail_log': {
+          return await handleTailLog(args, sessionManager, sshManager);
+        }
+        case 'ssh_tunnel_open': {
+          return await handleTunnelOpen(args, sessionManager, sshManager);
+        }
+        case 'ssh_tunnel_close': {
+          return await handleTunnelClose(args);
+        }
+        case 'ssh_tunnel_list': {
+          return await handleTunnelList();
+        }
+        case 'deploy': {
+          return await handleDeploy(args, sessionManager, sshManager);
+        }
+        case 'backup': {
+          return await handleBackup(args, sessionManager, sshManager);
+        }
+        case 'sync': {
+          return await handleSync(args, sessionManager, sshManager);
+        }
+        case 'group_exec': {
+          return await handleGroupExec(args, sessionManager, tmuxManager);
+        }
+        case 'db_query': {
+          return await handleDbQuery(args, sessionManager, sshManager);
+        }
+        case 'tools_config': {
+          return await handleToolsConfig(args, toolConfigManager);
+        }
+        case 'host_security': {
+          return await handleHostSecurity(args, hostSecurityManager);
         }
         default: {
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

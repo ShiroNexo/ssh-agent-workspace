@@ -41,13 +41,6 @@ export async function handleSftpUpload(
   sessionManager: SessionManager,
   sshManager: SSHManager
 ) {
-  if (isReadOnlyMode()) {
-    return {
-      content: [{ type: 'text' as const, text: 'Error: Server is in read-only mode. SFTP upload is disabled.' }],
-      isError: true,
-    };
-  }
-
   const parsed = sftpUploadSchema.safeParse(args);
   if (!parsed.success) {
     return {
@@ -62,6 +55,13 @@ export async function handleSftpUpload(
   if (!session) {
     return {
       content: [{ type: 'text' as const, text: `Error: Session '${session_id}' not found or has been disconnected` }],
+      isError: true,
+    };
+  }
+
+  if (isReadOnlyMode(session.host)) {
+    return {
+      content: [{ type: 'text' as const, text: `Error: Host '${session.host}' is in read-only mode. SFTP upload is disabled.` }],
       isError: true,
     };
   }

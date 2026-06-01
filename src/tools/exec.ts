@@ -97,18 +97,6 @@ export async function handleExec(
   sessionManager: SessionManager,
   tmuxManager: TmuxManager
 ) {
-  if (isReadOnlyMode()) {
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: 'Error: Server is in read-only mode. Command execution is disabled.',
-        },
-      ],
-      isError: true,
-    };
-  }
-
   const parsed = execSchema.safeParse(args);
   if (!parsed.success) {
     return {
@@ -144,6 +132,18 @@ export async function handleExec(
         {
           type: 'text' as const,
           text: `Error: Session '${session_id}' not found or has been disconnected`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (isReadOnlyMode(session.host)) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error: Host '${session.host}' is in read-only mode. Command execution is disabled.`,
         },
       ],
       isError: true,
