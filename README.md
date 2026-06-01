@@ -108,6 +108,164 @@ Host bastion
 
 Your agent now has a persistent workspace on `prod`. Running `cd /var/www` once means the agent stays there for every subsequent command.
 
+### Add to Your MCP Client
+
+<details>
+<summary><b>OpenCode</b></summary>
+
+Add to `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "workspace": {
+      "type": "local",
+      "command": ["npx", "-y", "ssh-agent-workspace"]
+    }
+  }
+}
+```
+
+Or via CLI:
+
+```bash
+opencode mcp add workspace -- npx -y ssh-agent-workspace
+```
+</details>
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+```bash
+claude mcp add workspace -- npx -y ssh-agent-workspace
+```
+
+Or add to `~/.config/claude-code/claude_code_config.json` or project `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["-y", "ssh-agent-workspace"],
+      "autoApprove": [
+        "mcp__workspace__connect",
+        "mcp__workspace__exec",
+        "mcp__workspace__send_input",
+        "mcp__workspace__read_output",
+        "mcp__workspace__list_hosts",
+        "mcp__workspace__list_sessions",
+        "mcp__workspace__sftp_upload",
+        "mcp__workspace__sftp_download",
+        "mcp__workspace__sftp_list"
+      ]
+    }
+  }
+}
+```
+
+> **Tip:** The `autoApprove` block lets the agent use those tools without asking permission each time. Add or remove tools based on your comfort level.
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+Go to `Cursor Settings` → `MCP` → `New MCP Server`. Use this config:
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["-y", "ssh-agent-workspace"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Codex (OpenAI)</b></summary>
+
+```bash
+codex mcp add workspace -- npx -y ssh-agent-workspace
+```
+
+Or add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.workspace]
+command = "npx"
+args = ["-y", "ssh-agent-workspace"]
+```
+</details>
+
+<details>
+<summary><b>Windsurf</b></summary>
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["-y", "ssh-agent-workspace"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Copilot / VS Code</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["-y", "ssh-agent-workspace"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Gemini CLI</b></summary>
+
+```bash
+gemini mcp add workspace npx -y ssh-agent-workspace
+```
+</details>
+
+<details>
+<summary><b>Cline</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["-y", "ssh-agent-workspace"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Qoder</b></summary>
+
+```bash
+qodercli mcp add workspace -- npx -y ssh-agent-workspace
+```
+</details>
+
+> **Using npx** means no global install needed. npx auto-downloads the latest version. If you installed globally (`npm install -g ssh-agent-workspace`), replace `"npx"` / `"-y"` / `"ssh-agent-workspace"` with `"ssh-agent-workspace"` as the command directly.
+
 ---
 
 ## Key Features
