@@ -1,11 +1,11 @@
 {
-  "name": "dynamic-ssh-mcp",
-  "version": "1.0.1",
-  "description": "Production-grade MCP server for persistent interactive SSH sessions with tmux",
+  "name": "ssh-agent-workspace",
+  "version": "1.0.0",
+  "description": "Persistent SSH workspaces for AI agents. Stateful tmux-backed sessions that survive reconnects, restarts, and network drops — with runtime security and tool configuration.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "dynamic-ssh-mcp": "dist/index.js"
+    "ssh-agent-workspace": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -18,6 +18,9 @@
     "mcp",
     "ssh",
     "tmux",
+    "stateful",
+    "workspace",
+    "persistent",
     "opencode",
     "claude",
     "ai-agent"

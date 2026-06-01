@@ -1,6 +1,6 @@
 # Security Model
 
-`dynamic-ssh-mcp` implements a **three-layer defense** architecture. Each layer adds granularity without breaking the layers above it.
+`ssh-agent-workspace` implements a **three-layer defense** architecture. Each layer adds granularity without breaking the layers above it.
 
 ---
 
