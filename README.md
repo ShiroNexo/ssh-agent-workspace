@@ -123,9 +123,8 @@ Your agent now has a persistent workspace on `prod`.
 
 ### Add to Your MCP Client
 
-Pick your client:
-
-#### OpenCode
+<details>
+<summary><b>OpenCode</b></summary>
 
 Add to `~/.config/opencode/opencode.json`:
 
@@ -146,8 +145,10 @@ Or via CLI:
 ```bash
 opencode mcp add workspace -- npx -y ssh-agent-workspace
 ```
+</details>
 
-#### Claude Code
+<details>
+<summary><b>Claude Code</b></summary>
 
 ```bash
 claude mcp add workspace -- npx -y ssh-agent-workspace
@@ -177,9 +178,11 @@ Or add to `~/.config/claude-code/claude_code_config.json` or project `.mcp.json`
 }
 ```
 
-**Tip:** The `autoApprove` block lets the agent use those tools without asking permission each time. Add or remove tools based on your comfort level.
+> **Tip:** The `autoApprove` block lets the agent use those tools without asking permission each time. Add or remove tools based on your comfort level.
+</details>
 
-#### Cursor
+<details>
+<summary><b>Cursor</b></summary>
 
 Go to `Cursor Settings` → `MCP` → `New MCP Server`. Use this config:
 
@@ -193,8 +196,10 @@ Go to `Cursor Settings` → `MCP` → `New MCP Server`. Use this config:
   }
 }
 ```
+</details>
 
-#### Codex (OpenAI)
+<details>
+<summary><b>Codex (OpenAI)</b></summary>
 
 ```bash
 codex mcp add workspace -- npx -y ssh-agent-workspace
@@ -207,8 +212,10 @@ Or add to `~/.codex/config.toml`:
 command = "npx"
 args = ["-y", "ssh-agent-workspace"]
 ```
+</details>
 
-#### Windsurf
+<details>
+<summary><b>Windsurf</b></summary>
 
 Add to `~/.codeium/windsurf/mcp_config.json`:
 
@@ -222,8 +229,10 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   }
 }
 ```
+</details>
 
-#### Copilot / VS Code
+<details>
+<summary><b>Copilot / VS Code</b></summary>
 
 ```json
 {
@@ -235,14 +244,18 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   }
 }
 ```
+</details>
 
-#### Gemini CLI
+<details>
+<summary><b>Gemini CLI</b></summary>
 
 ```bash
 gemini mcp add workspace npx -y ssh-agent-workspace
 ```
+</details>
 
-#### Cline
+<details>
+<summary><b>Cline</b></summary>
 
 ```json
 {
@@ -254,18 +267,17 @@ gemini mcp add workspace npx -y ssh-agent-workspace
   }
 }
 ```
+</details>
 
-#### Qoder
+<details>
+<summary><b>Qoder</b></summary>
 
 ```bash
 qodercli mcp add workspace -- npx -y ssh-agent-workspace
 ```
+</details>
 
-#### Using npx
-
-All examples above use `npx` which auto-downloads the latest version. No global install needed.
-
-If you installed globally (`npm install -g ssh-agent-workspace`), replace `"npx"` / `"-y"` / `"ssh-agent-workspace"` with `"ssh-agent-workspace"` as the command directly.
+> **Using npx** means no global install needed. npx auto-downloads the latest version. If you installed globally (`npm install -g ssh-agent-workspace`), replace `"npx"` / `"-y"` / `"ssh-agent-workspace"` with `"ssh-agent-workspace"` as the command directly.
 
 Your agent now has a persistent workspace on `prod`. Running `cd /var/www` once means the agent stays there for every subsequent command.
 
@@ -322,7 +334,8 @@ No restart needed. Changes apply immediately.
 
 ## Tools (25)
 
-### Workspace (9)
+<details>
+<summary><b>Workspace (9 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
@@ -335,45 +348,58 @@ No restart needed. Changes apply immediately.
 | `disconnect` | Close session. Optionally kill tmux or keep alive |
 | `list_hosts` | List `~/.ssh/config` aliases |
 | `list_sessions` | List active workspaces |
+</details>
 
-### File Transfer (3)
+<details>
+<summary><b>File Transfer (3 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
 | `sftp_upload` | Upload file to remote |
 | `sftp_download` | Download file from remote |
 | `sftp_list` | List remote directory |
+</details>
 
-### Monitoring (3)
+<details>
+<summary><b>Monitoring (3 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
 | `connection_status` | SSH liveness + tmux existence |
 | `health_check` | CPU / RAM / Disk / Load / Uptime |
 | `tail_log` | Log tail with optional follow |
+</details>
 
-### DevOps (4)
+<details>
+<summary><b>DevOps (6 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
 | `deploy` | Upload → backup → chmod → chown → restart |
 | `backup` | tar.gz archive → download → cleanup |
 | `sync` | Rsync-lite via SFTP (bidirectional, dry-run) |
-| `ssh_tunnel_open` / `ssh_tunnel_list` / `ssh_tunnel_close` | Port forwarding + SOCKS5 |
+| `ssh_tunnel_open` | Local port forward or SOCKS5 proxy |
+| `ssh_tunnel_list` | List active tunnels |
+| `ssh_tunnel_close` | Close tunnel, free port |
+</details>
 
-### Cluster & Queries (2)
+<details>
+<summary><b>Cluster & Queries (2 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
 | `group_exec` | Run command across multiple workspaces (parallel/sequential) |
 | `db_query` | Read-only MySQL / PostgreSQL / MongoDB via SSH |
+</details>
 
-### Runtime Config (2)
+<details>
+<summary><b>Runtime Config (2 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
 | `tools_config` | Enable/disable tools at runtime |
 | `host_security` | Per-host read-only, command allow/denylist |
+</details>
 
 **Full reference:** [`docs/TOOLS.md`](docs/TOOLS.md) | **Security:** [`docs/SECURITY.md`](docs/SECURITY.md)
 
