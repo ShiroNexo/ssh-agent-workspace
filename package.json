@@ -1,6 +1,6 @@
 {
   "name": "dynamic-ssh-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production-grade MCP server for persistent interactive SSH sessions with tmux",
   "type": "module",
   "main": "dist/index.js",
