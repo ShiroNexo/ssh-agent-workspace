@@ -64,7 +64,6 @@ Your agent gets a **real interactive terminal** — not one-off exec commands. I
 | **Prompt detection** | Deterministic custom PS1 | Blind sleep + guess |
 | **Per-host security** | runtime `host_security` tool | Env vars only, restart required |
 | **Tool management** | runtime `tools_config` (persistent) | None or env vars |
-| **Token efficiency** | ~2,800 tokens (25 tools) | ~43,500 tokens (37 tools) |
 
 ---
 
@@ -79,33 +78,127 @@ npm install -g ssh-agent-workspace
 Or from source:
 
 ```bash
-git clone https://github.com/ShiroNexo/dynamic-ssh-mcp.git
-cd dynamic-ssh-mcp
+git clone https://github.com/ShiroNexo/ssh-agent-workspace.git
+cd ssh-agent-workspace
 npm install && npm run build
 ```
 
-### Configure MCP Client
+### Setup Your SSH Config
+
+Hosts must be defined in `~/.ssh/config`:
+
+```
+Host prod
+  HostName 10.0.0.5
+  User deploy
+  IdentityFile ~/.ssh/id_ed25519
+
+Host staging
+  HostName 10.0.0.10
+  User deploy
+  IdentityFile ~/.ssh/id_ed25519
+
+Host internal
+  HostName 172.16.0.50
+  User admin
+  ProxyJump bastion
+
+Host bastion
+  HostName jump.example.com
+  User jumpuser
+```
+
+### Try It
+
+```
+> connect host=prod
+→ { session_id: "sess_abc", tmux_session: "mcp_prod_x1y2z3" }
+```
+
+Your agent now has a persistent workspace on `prod`.
+
+---
+
+### Add to Your MCP Client
+
+#### OpenCode
+
+Add to `opencode.json`:
 
 ```json
 {
   "mcpServers": {
     "workspace": {
       "command": "node",
-      "args": ["/path/to/dist/index.js"],
-      "env": {
-        "MCP_SSH_RESTORE_SESSIONS": "true"
-      }
+      "args": ["/path/to/ssh-agent-workspace/dist/index.js"]
     }
   }
 }
 ```
 
-### First session
+Or via CLI:
 
+```bash
+opencode mcp add workspace -- node /path/to/ssh-agent-workspace/dist/index.js
 ```
-> connect host=prod
-→ { session_id: "sess_abc", tmux_session: "mcp_prod_x1y2z3" }
+
+#### Claude Code
+
+```bash
+claude mcp add workspace -- node /path/to/ssh-agent-workspace/dist/index.js
 ```
+
+Or add to Claude Code config (`~/.config/claude-code/claude_code_config.json` or project `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "node",
+      "args": ["/path/to/ssh-agent-workspace/dist/index.js"],
+      "autoApprove": [
+        "mcp__workspace__connect",
+        "mcp__workspace__exec",
+        "mcp__workspace__send_input",
+        "mcp__workspace__read_output",
+        "mcp__workspace__list_hosts",
+        "mcp__workspace__list_sessions",
+        "mcp__workspace__sftp_upload",
+        "mcp__workspace__sftp_download",
+        "mcp__workspace__sftp_list"
+      ]
+    }
+  }
+}
+```
+
+**Tip:** The `autoApprove` block lets the agent use those tools without asking you for permission each time. Add or remove tools based on your comfort level.
+
+#### Cursor / Windsurf / Generic MCP
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "node",
+      "args": ["/path/to/ssh-agent-workspace/dist/index.js"]
+    }
+  }
+}
+```
+
+#### If Using npx (no global install)
+
+Replace `"command": "node"` and `"args"` with:
+
+```json
+{
+  "command": "npx",
+  "args": ["-y", "ssh-agent-workspace"]
+}
+```
+
+npx will download and run the latest version automatically.
 
 Your agent now has a persistent workspace on `prod`. Running `cd /var/www` once means the agent stays there for every subsequent command.
 
@@ -263,25 +356,6 @@ No restart needed. Changes apply immediately.
 | `MCP_SSH_DENYLIST_COMMANDS` | `(none)` | Global command blocklist |
 | `MCP_SSH_RESTORE_SESSIONS` | `true` | Auto-restore workspaces on startup |
 
-### SSH Config
-
-Hosts must be defined in `~/.ssh/config`:
-
-```
-Host prod
-  HostName 10.0.0.5
-  User deploy
-  IdentityFile ~/.ssh/id_ed25519
-
-Host internal
-  HostName 172.16.0.50
-  User admin
-  ProxyJump bastion
-
-Host bastion
-  HostName jump.example.com
-  User jumpuser
-```
 ---
 
 ## Project Structure
