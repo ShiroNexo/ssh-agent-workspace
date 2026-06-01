@@ -1,6 +1,6 @@
 {
   "name": "ssh-agent-workspace",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Persistent SSH workspaces for AI agents. Stateful tmux-backed sessions that survive reconnects, restarts, and network drops — with runtime security and tool configuration.",
   "type": "module",
   "main": "dist/index.js",

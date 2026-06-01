@@ -1,69 +1,60 @@
 # ssh-agent-workspace
 
-> **Persistent SSH workspaces for AI agents.**
->
-> Stateful tmux-backed sessions that survive reconnects, MCP restarts, and network drops — with runtime security policies and tool configuration.
-
 <p align="left">
   <img src="https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js" alt="Node.js ≥18">
   <img src="https://img.shields.io/badge/MCP-Server-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Tools-25-blue" alt="25 tools">
-  <img src="https://img.shields.io/badge/npm-v1.0.0-red?logo=npm" alt="npm">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey" alt="platform">
 </p>
 
----
+**Stateful persistent workspace for AI agents over SSH.**
 
-## The Problem
-
-Every SSH MCP server runs commands in a **fresh shell**. That means:
+Unlike traditional SSH MCP servers that execute every command in a fresh shell, SSH Agent Workspace provides a tmux-backed workspace that survives multiple commands, SSH reconnects, MCP restarts, and network interruptions. Your working directory, environment variables, shell history, and running processes remain intact.
 
 ```
-❌ cwd resets every time
-❌ env vars are gone
-❌ shell history disappears
-❌ vim / htop / docker attach break
-❌ all state evaporates on reconnect
+Traditional SSH MCP
+
+AI
+ └─ ssh exec channel
+      └─ command
+           └─ state lost every time
+
+
+SSH Agent Workspace
+
+AI
+ └─ persistent tmux workspace
+      ├─ cwd persists
+      ├─ env persists
+      ├─ shell history persists
+      ├─ running processes persist
+      └─ auto recovery
 ```
-
-Your AI agent has to `cd`, re-export, re-configure before every single command — wasting tokens, time, and context.
-
----
-
-## What ssh-agent-workspace Does
-
-```
-AI Agent
-   │
-   │ MCP stdio
-   ▼
-tmux workspace (persistent)
-   ├─ cwd survives
-   ├─ env survives
-   ├─ history survives
-   ├─ processes survive (vim, htop, docker attach...)
-   ├─ auto-restore after MCP restart
-   ├─ auto-restore after SSH drop
-   ├─ runtime security per host
-   └─ runtime tool enable/disable
-```
-
-Your agent gets a **real interactive terminal** — not one-off exec commands. It's like giving your AI its own tmux session that never dies.
 
 ---
 
-## Comparison
+## Why This Exists
 
-| | ssh-agent-workspace | Typical SSH MCP |
-|---|---|---|
-| **Session model** | Persistent tmux workspace | Throwaway exec channel |
-| **cwd / env / history** | Survives everything | Lost after each command |
-| **Running processes** | Stay alive (vim, htop, etc.) | Killed immediately |
-| **Reconnection** | Auto-restore on startup | Manual reconnect, fresh shell |
-| **Prompt detection** | Deterministic custom PS1 | Blind sleep + guess |
-| **Per-host security** | runtime `host_security` tool | Env vars only, restart required |
-| **Tool management** | runtime `tools_config` (persistent) | None or env vars |
+Most SSH MCP servers use exec channels. Every command starts from scratch:
+
+```
+❌ No persistent cwd — cd /var/www before every command
+❌ No persistent env vars — re-export forever
+❌ Interactive programs break — vim, htop, docker attach don't work
+❌ State disappears after reconnect — start over from nothing
+```
+
+SSH Agent Workspace treats SSH as a **persistent workspace** instead of a command runner. Give your AI agent a real terminal that stays alive.
+
+---
+
+## Core Features
+
+- **Stateful workspaces** — Persistent tmux-backed sessions. cwd, env, history survive everything.
+- **Automatic recovery** — Reconnect to existing sessions after SSH drops or MCP restarts.
+- **Runtime reconfiguration** — Enable/disable tools, update per-host security policies without restart.
+- **Deterministic output** — Prompt sentinel-based execution. No sleep-based output guessing.
 
 ---
 
@@ -71,13 +62,11 @@ Your agent gets a **real interactive terminal** — not one-off exec commands. I
 
 ### Install
 
-npx auto-downloads and runs the latest version. Or install globally:
-
 ```bash
 npm install -g ssh-agent-workspace
 ```
 
-From source:
+Or from source:
 
 ```bash
 git clone https://github.com/ShiroNexo/ssh-agent-workspace.git
@@ -116,168 +105,6 @@ Host bastion
 > connect host=prod
 → { session_id: "sess_abc", tmux_session: "mcp_prod_x1y2z3" }
 ```
-
-Your agent now has a persistent workspace on `prod`.
-
----
-
-### Add to Your MCP Client
-
-<details>
-<summary><b>OpenCode</b></summary>
-
-Add to `~/.config/opencode/opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "workspace": {
-      "type": "local",
-      "command": ["npx", "-y", "ssh-agent-workspace"]
-    }
-  }
-}
-```
-
-Or via CLI:
-
-```bash
-opencode mcp add workspace -- npx -y ssh-agent-workspace
-```
-</details>
-
-<details>
-<summary><b>Claude Code</b></summary>
-
-```bash
-claude mcp add workspace -- npx -y ssh-agent-workspace
-```
-
-Or add to `~/.config/claude-code/claude_code_config.json` or project `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "workspace": {
-      "command": "npx",
-      "args": ["-y", "ssh-agent-workspace"],
-      "autoApprove": [
-        "mcp__workspace__connect",
-        "mcp__workspace__exec",
-        "mcp__workspace__send_input",
-        "mcp__workspace__read_output",
-        "mcp__workspace__list_hosts",
-        "mcp__workspace__list_sessions",
-        "mcp__workspace__sftp_upload",
-        "mcp__workspace__sftp_download",
-        "mcp__workspace__sftp_list"
-      ]
-    }
-  }
-}
-```
-
-> **Tip:** The `autoApprove` block lets the agent use those tools without asking permission each time. Add or remove tools based on your comfort level.
-</details>
-
-<details>
-<summary><b>Cursor</b></summary>
-
-Go to `Cursor Settings` → `MCP` → `New MCP Server`. Use this config:
-
-```json
-{
-  "mcpServers": {
-    "workspace": {
-      "command": "npx",
-      "args": ["-y", "ssh-agent-workspace"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Codex (OpenAI)</b></summary>
-
-```bash
-codex mcp add workspace -- npx -y ssh-agent-workspace
-```
-
-Or add to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.workspace]
-command = "npx"
-args = ["-y", "ssh-agent-workspace"]
-```
-</details>
-
-<details>
-<summary><b>Windsurf</b></summary>
-
-Add to `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "workspace": {
-      "command": "npx",
-      "args": ["-y", "ssh-agent-workspace"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Copilot / VS Code</b></summary>
-
-```json
-{
-  "mcpServers": {
-    "workspace": {
-      "command": "npx",
-      "args": ["-y", "ssh-agent-workspace"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Gemini CLI</b></summary>
-
-```bash
-gemini mcp add workspace npx -y ssh-agent-workspace
-```
-</details>
-
-<details>
-<summary><b>Cline</b></summary>
-
-```json
-{
-  "mcpServers": {
-    "workspace": {
-      "command": "npx",
-      "args": ["-y", "ssh-agent-workspace"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Qoder</b></summary>
-
-```bash
-qodercli mcp add workspace -- npx -y ssh-agent-workspace
-```
-</details>
-
-> **Using npx** means no global install needed. npx auto-downloads the latest version. If you installed globally (`npm install -g ssh-agent-workspace`), replace `"npx"` / `"-y"` / `"ssh-agent-workspace"` with `"ssh-agent-workspace"` as the command directly.
 
 Your agent now has a persistent workspace on `prod`. Running `cd /var/www` once means the agent stays there for every subsequent command.
 
