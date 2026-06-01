@@ -181,8 +181,7 @@ export MCP_SSH_READONLY=true
 export MCP_SSH_ALLOWED_HOSTS=prod,staging
 
 # Block dangerous operations
-export MCP_SSH_DENYLIST_COMMANDS=rm\ -rf,shutdown,reboot,dd,chmod\ 777,>\
-/dev/sd
+export MCP_SSH_DENYLIST_COMMANDS="rm -rf,shutdown,reboot,dd if=,chmod 777,fdisk,mkfs"
 
 # Only restore known sessions (don't discover new ones)
 export MCP_SSH_RESTORE_SESSIONS=true

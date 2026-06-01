@@ -6,7 +6,9 @@
   <img src="https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js" alt="Node.js ≥18">
   <img src="https://img.shields.io/badge/MCP-Server-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Tools-25-blue" alt="25 tools">
+  <img src="https://img.shields.io/badge/npm-v1.0.0-red?logo=npm" alt="npm">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+  <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey" alt="platform">
 </p>
 
 ---
@@ -51,6 +53,16 @@ tmux session on remote host (bash/zsh)
 
 ### Install
 
+#### From npm (recommended)
+
+```bash
+npm install -g dynamic-ssh-mcp
+```
+
+Then use `dynamic-ssh-mcp` directly in your MCP config.
+
+#### From source
+
 ```bash
 git clone https://github.com/ShiroNexo/dynamic-ssh-mcp.git
 cd dynamic-ssh-mcp
@@ -59,12 +71,6 @@ npm run build
 ```
 
 ### Configure MCP Client
-
-#### OpenCode CLI
-
-```bash
-opencode mcp add ssh --scope user -- node dist/index.js
-```
 
 #### opencode.json
 
@@ -360,6 +366,75 @@ dynamic-ssh-mcp/
 ```bash
 npm test              # Run all tests
 npm run test:watch    # Watch mode
+```
+
+---
+
+## Usage Examples
+
+### Connect and execute
+
+```
+> connect host=prod
+→ session_id: sess_abc12345, host: prod, tmux_session: mcp_prod_x1y2z3
+
+> exec session_id=sess_abc12345 command="docker ps"
+→ 3 containers running
+
+> exec session_id=sess_abc12345 command="htop" wait_ms=500 max_wait_ms=3000
+→ (interactive process runs in tmux)
+```
+
+### SFTP upload
+
+```
+> sftp_upload session_id=sess_abc12345 local_path="/path/to/config.json" remote_path="/etc/app/config.json"
+→ Upload complete: /etc/app/config.json
+```
+
+### Health check (via SSH exec, doesn't touch tmux)
+
+```
+> health_check session_id=sess_abc12345
+→ { cpu: { usage: 12.3 }, memory: { usage: 45.1 }, disk: [...], uptime: "14 days" }
+```
+
+### Proxy jump through bastion
+
+```
+> connect host=internal proxy_jump=bastion
+→ (routes through bastion → internal)
+```
+
+### Deploy with pipeline
+
+```
+> deploy session_id=sess_abc12345 files=[{"local":"dist/app.js","remote":"/var/www/app.js"}] backup=true chmod="755" restart_service="nginx"
+→ { status: "ok", backup: "/var/www/app.js.bak" }
+```
+
+### Multi-server command execution
+
+```
+> group_exec session_ids=["sess_abc","sess_def"] command="uptime"
+→ [{ session_id: sess_abc, host: prod, status: ok, output: "..." },
+    { session_id: sess_def, host: staging, status: ok, output: "..." }]
+```
+
+### Read-only database query
+
+```
+> db_query session_id=sess_abc12345 type=mysql database=mydb query="SELECT COUNT(*) FROM users"
+→ [{ "COUNT(*)": 15423 }]
+```
+
+### Session survival
+
+```
+(SSH drops → tmux session persists on remote)
+> reconnect_to_tmux host=prod tmux_session=mcp_prod_x1y2z3
+→ session_id: sess_new789, reconnected successfully
+(prompt restored, cwd, env, history intact)
 ```
 
 ---
