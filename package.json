@@ -1,48 +1,59 @@
 {
-  "name": "ssh-agent-workspace",
-  "version": "1.0.4",
-  "description": "Persistent SSH workspaces for AI agents. Stateful tmux-backed sessions that survive reconnects, restarts, and network drops — with runtime security and tool configuration.",
-  "type": "module",
-  "main": "dist/index.js",
-  "bin": {
-    "ssh-agent-workspace": "dist/index.js"
-  },
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc --watch",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "keywords": [
-    "mcp",
-    "ssh",
-    "tmux",
-    "stateful",
-    "workspace",
-    "persistent",
-    "opencode",
-    "claude",
-    "ai-agent"
-  ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "pino": "^9.5.0",
-    "ssh-config": "^5.0.0",
-    "ssh2": "^1.16.0",
-    "uuid": "^11.0.0",
-    "zod": "^3.23.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/ssh2": "^1.15.0",
-    "@types/uuid": "^10.0.0",
-    "typescript": "^5.6.0",
-    "vitest": "^4.1.7"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+    "name": "ssh-agent-workspace",
+    "version": "1.0.4",
+    "description": "Persistent SSH workspaces for AI agents. Stateful tmux-backed sessions that survive reconnects, restarts, and network drops — with runtime security and tool configuration.",
+    "type": "module",
+    "main": "dist/index.js",
+    "bin": {
+        "ssh-agent-workspace": "dist/index.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsc --watch",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "ssh",
+        "tmux",
+        "stateful",
+        "persistent",
+        "workspace",
+        "ai-agent",
+        "claude",
+        "codex",
+        "remote-execution",
+        "devops"
+    ],
+    "author": "ShiroNexo",
+    "homepage": "https://github.com/ShiroNexo/ssh-agent-workspace#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ShiroNexo/ssh-agent-workspace.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ShiroNexo/ssh-agent-workspace/issues"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
+        "pino": "^9.5.0",
+        "ssh-config": "^5.0.0",
+        "ssh2": "^1.16.0",
+        "uuid": "^11.0.0",
+        "zod": "^3.23.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/ssh2": "^1.15.0",
+        "@types/uuid": "^10.0.0",
+        "typescript": "^5.6.0",
+        "vitest": "^4.1.7"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
 }

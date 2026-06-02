@@ -1,11 +1,11 @@
-import pino from 'pino';
+import pino from "pino";
 
 export const logger = pino(
-  {
-    level: process.env.LOG_LEVEL || 'info',
-    base: {
-      pid: process.pid,
+    {
+        level: process.env.LOG_LEVEL || "info",
+        base: {
+            pid: process.pid,
+        },
     },
-  },
-  process.stderr
+    process.stderr,
 );
