@@ -201,30 +201,29 @@ if not exist "%CONFIG%" (
 
 :: Use word-boundary match: "^Host <alias>$" to avoid partial matches
 :: (e.g. alias "prod" must not match "production")
-findstr /r /c:"^Host !ALIAS!$" "%CONFIG%" >nul 2>nul
+findstr /i /r /c:"^Host[ ]*!ALIAS![ ]*$" "%CONFIG%" >nul 2>nul
 if not errorlevel 1 (
     echo  [=] Alias [!ALIAS!] already exists in config, skipped.
     goto :config_done
 )
 
-:: Write each line individually — parenthesised blocks are unreliable
-:: with delayed expansion enabled on some Windows versions.
-:: NOTE: no space before ">>" so trailing spaces are not written to the file.
->>"%CONFIG%" echo.
->>"%CONFIG%" echo Host !ALIAS!
->>"%CONFIG%" echo     HostName !HOST!
->>"%CONFIG%" echo     User !SSHUSER!
->>"%CONFIG%" echo     Port !PORT!
->>"%CONFIG%" echo     IdentityFile !PRIVKEY!
->>"%CONFIG%" echo     ServerAliveInterval 60
->>"%CONFIG%" echo     ServerAliveCountMax 3
->>"%CONFIG%" echo     StrictHostKeyChecking accept-new
-
-if errorlevel 1 (
+(
+    echo.
+    echo Host !ALIAS!
+    echo     HostName !HOST!
+    echo     User !SSHUSER!
+    echo     Port !PORT!
+    echo     IdentityFile !PRIVKEY!
+    echo     ServerAliveInterval 60
+    echo     ServerAliveCountMax 3
+    echo     StrictHostKeyChecking accept-new
+)>>"%CONFIG%" || (
     echo  [X] Failed to write to: %CONFIG%
     pause & exit /b 1
 )
+
 echo  [+] Alias [!ALIAS!] added to config.
+
 
 :config_done
 echo.

@@ -4,6 +4,7 @@ import { SSHManager } from "../core/SSHManager.js";
 import { TmuxManager, MCP_PROMPT } from "../core/TmuxManager.js";
 import { listHostAliases, getHostConfig } from "../utils/sshConfig.js";
 import { buildSshConfig } from "../utils/ssh.js";
+import { resolveProxyJump } from "../utils/proxy.js";
 import { isHostAllowed } from "../utils/security.js";
 import { logger } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
@@ -11,13 +12,13 @@ import { v4 as uuidv4 } from "uuid";
 export const reconnectSchema = z.object({
     host: z.string().min(1).describe("SSH host alias from ~/.ssh/config"),
     tmux_session: z.string().min(1).describe("Name of the existing tmux session on the remote host"),
-    proxy_jump: z.string().min(1).optional().describe("SSH host alias of the bastion/jump host"),
+    proxy_jump: z.string().optional().describe("SSH host alias of the bastion/jump host. Usually not needed; omit for direct connections."),
 });
 
 export const reconnectTool = {
     name: "reconnect_to_tmux",
     description:
-        "Reconnect to an existing tmux session on a remote host. Useful for recovery after MCP restarts or SSH disconnections.",
+        "Reconnect to an existing tmux session on a remote host. Useful for recovery after MCP restarts or SSH disconnections. proxy_jump is optional and almost never needed — only supply it when the target host is only reachable through a bastion/jump host. Otherwise omit it entirely.",
     inputSchema: {
         type: "object" as const,
         properties: {
@@ -31,7 +32,7 @@ export const reconnectTool = {
             },
             proxy_jump: {
                 type: "string",
-                description: "Optional SSH host alias of a bastion/jump host",
+                description: "Optional SSH host alias of a bastion/jump host. Usually not needed; omit for direct connections.",
             },
         },
         required: ["host", "tmux_session"],
@@ -98,7 +99,7 @@ export async function handleReconnect(
         };
     }
 
-    const proxyJumpAlias = parsed.data.proxy_jump || hostConfig.proxyJump;
+    const proxy = resolveProxyJump(parsed.data.proxy_jump, hostConfig);
 
     const sshConfig = buildSshConfig(hostConfig);
     if (!sshConfig) {
@@ -115,40 +116,13 @@ export async function handleReconnect(
 
     let ssh;
     try {
-        if (proxyJumpAlias) {
-            if (!isHostAllowed(proxyJumpAlias)) {
-                return {
-                    content: [{ type: "text" as const, text: `Error: Proxy host '${proxyJumpAlias}' is not allowed` }],
-                    isError: true,
-                };
-            }
-            const proxyConfig = getHostConfig(proxyJumpAlias);
-            if (!proxyConfig) {
-                return {
-                    content: [
-                        {
-                            type: "text" as const,
-                            text: `Error: Failed to resolve SSH config for proxy '${proxyJumpAlias}'`,
-                        },
-                    ],
-                    isError: true,
-                };
-            }
-            const proxySshConfig = buildSshConfig(proxyConfig);
-            if (!proxySshConfig) {
-                return {
-                    content: [
-                        { type: "text" as const, text: `Error: Failed to read SSH key for proxy '${proxyJumpAlias}'` },
-                    ],
-                    isError: true,
-                };
-            }
-            ssh = await sshManager.connectWithProxy(proxySshConfig, sshConfig);
+        if (proxy.proxyConfig) {
+            ssh = await sshManager.connectWithProxy(proxy.proxyConfig, sshConfig);
         } else {
             ssh = await sshManager.connect(sshConfig);
         }
     } catch (err) {
-        logger.error({ host, proxyJump: proxyJumpAlias, error: (err as Error).message }, "SSH connection failed");
+        logger.error({ host, proxyJump: parsed.data.proxy_jump, error: (err as Error).message }, "SSH connection failed");
         return {
             content: [
                 {
@@ -220,6 +194,7 @@ export async function handleReconnect(
                         host: session.host,
                         tmux_session: session.tmuxSession,
                         status: "reconnected",
+                        ...(proxy.warning ? { proxy_jump_warning: proxy.warning } : {}),
                     },
                     null,
                     2,

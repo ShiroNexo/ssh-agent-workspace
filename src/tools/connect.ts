@@ -4,6 +4,7 @@ import { SSHManager } from "../core/SSHManager.js";
 import { TmuxManager, MCP_PROMPT } from "../core/TmuxManager.js";
 import { listHostAliases, getHostConfig } from "../utils/sshConfig.js";
 import { buildSshConfig } from "../utils/ssh.js";
+import { resolveProxyJump } from "../utils/proxy.js";
 import { sanitizeTmuxSessionName } from "../utils/validation.js";
 import { isHostAllowed } from "../utils/security.js";
 import { logger } from "../utils/logger.js";
@@ -11,13 +12,13 @@ import { v4 as uuidv4 } from "uuid";
 
 export const connectSchema = z.object({
     host: z.string().min(1).describe("SSH host alias from ~/.ssh/config"),
-    proxy_jump: z.string().min(1).optional().describe("SSH host alias of the bastion/jump host to tunnel through"),
+    proxy_jump: z.string().optional().describe("SSH host alias of the bastion/jump host to tunnel through. Usually not needed; omit for direct connections."),
 });
 
 export const connectTool = {
     name: "connect",
     description:
-        "Connect to a remote host via SSH and establish a persistent tmux-backed interactive shell session. Supports bash and zsh only. Use proxy_jump to tunnel through a bastion host.",
+        "Connect to a remote host via SSH and establish a persistent tmux-backed interactive shell session. Supports bash and zsh only. proxy_jump is optional and almost never needed — only supply it when the target host is only reachable through a bastion/jump host. Otherwise omit it entirely.",
     inputSchema: {
         type: "object" as const,
         properties: {
@@ -27,7 +28,7 @@ export const connectTool = {
             },
             proxy_jump: {
                 type: "string",
-                description: "Optional SSH host alias of a bastion/jump host. Overrides ProxyJump from ~/.ssh/config.",
+                description: "Optional SSH host alias of a bastion/jump host. Overrides ProxyJump from ~/.ssh/config. Usually not needed; omit for direct connections.",
             },
         },
         required: ["host"],
@@ -96,7 +97,7 @@ export async function handleConnect(
         };
     }
 
-    const proxyJumpAlias = parsed.data.proxy_jump || hostConfig.proxyJump;
+    const proxy = resolveProxyJump(parsed.data.proxy_jump, hostConfig);
 
     const sshConfig = buildSshConfig(hostConfig);
     if (!sshConfig) {
@@ -113,46 +114,14 @@ export async function handleConnect(
 
     let ssh;
     try {
-        if (proxyJumpAlias) {
-            if (!isHostAllowed(proxyJumpAlias)) {
-                return {
-                    content: [
-                        {
-                            type: "text" as const,
-                            text: `Error: Proxy host '${proxyJumpAlias}' is not in the allowed hosts list`,
-                        },
-                    ],
-                    isError: true,
-                };
-            }
-            const proxyConfig = getHostConfig(proxyJumpAlias);
-            if (!proxyConfig) {
-                return {
-                    content: [
-                        {
-                            type: "text" as const,
-                            text: `Error: Failed to resolve SSH config for proxy '${proxyJumpAlias}'`,
-                        },
-                    ],
-                    isError: true,
-                };
-            }
-            const proxySshConfig = buildSshConfig(proxyConfig);
-            if (!proxySshConfig) {
-                return {
-                    content: [
-                        { type: "text" as const, text: `Error: Failed to read SSH key for proxy '${proxyJumpAlias}'` },
-                    ],
-                    isError: true,
-                };
-            }
-            ssh = await sshManager.connectWithProxy(proxySshConfig, sshConfig);
-            logger.info({ host, proxy: proxyJumpAlias }, "Connected via bastion");
+        if (proxy.proxyConfig) {
+            ssh = await sshManager.connectWithProxy(proxy.proxyConfig, sshConfig);
+            logger.info({ host, proxy: proxy.proxyConfig.host }, "Connected via bastion");
         } else {
             ssh = await sshManager.connect(sshConfig);
         }
     } catch (err) {
-        logger.error({ host, proxyJump: proxyJumpAlias, error: (err as Error).message }, "SSH connection failed");
+        logger.error({ host, proxy: parsed.data.proxy_jump, error: (err as Error).message }, "SSH connection failed");
         return {
             content: [
                 {
@@ -263,6 +232,7 @@ export async function handleConnect(
                         host: session.host,
                         tmux_session: session.tmuxSession,
                         shell: shell || "unknown",
+                        ...(proxy.warning ? { proxy_jump_warning: proxy.warning } : {}),
                     },
                     null,
                     2,
