@@ -12,13 +12,12 @@ import { v4 as uuidv4 } from "uuid";
 export const reconnectSchema = z.object({
     host: z.string().min(1).describe("SSH host alias from ~/.ssh/config"),
     tmux_session: z.string().min(1).describe("Name of the existing tmux session on the remote host"),
-    proxy_jump: z.string().optional().describe("SSH host alias of the bastion/jump host. Usually not needed; omit for direct connections."),
 });
 
 export const reconnectTool = {
     name: "reconnect_to_tmux",
     description:
-        "Reconnect to an existing tmux session on a remote host. Useful for recovery after MCP restarts or SSH disconnections. proxy_jump is optional and almost never needed — only supply it when the target host is only reachable through a bastion/jump host. Otherwise omit it entirely.",
+        "Reconnect to an existing tmux session on a remote host. Useful for recovery after MCP restarts or SSH disconnections. Bastion/jump hosts are read automatically from ProxyJump in ~/.ssh/config — no proxy parameter is needed.",
     inputSchema: {
         type: "object" as const,
         properties: {
@@ -29,10 +28,6 @@ export const reconnectTool = {
             tmux_session: {
                 type: "string",
                 description: "Name of the existing tmux session on the remote host",
-            },
-            proxy_jump: {
-                type: "string",
-                description: "Optional SSH host alias of a bastion/jump host. Usually not needed; omit for direct connections.",
             },
         },
         required: ["host", "tmux_session"],
@@ -99,7 +94,7 @@ export async function handleReconnect(
         };
     }
 
-    const proxy = resolveProxyJump(parsed.data.proxy_jump, hostConfig);
+    const proxy = resolveProxyJump(hostConfig);
 
     const sshConfig = buildSshConfig(hostConfig);
     if (!sshConfig) {
@@ -122,7 +117,7 @@ export async function handleReconnect(
             ssh = await sshManager.connect(sshConfig);
         }
     } catch (err) {
-        logger.error({ host, proxyJump: parsed.data.proxy_jump, error: (err as Error).message }, "SSH connection failed");
+        logger.error({ host, proxy: proxy.proxyConfig?.host, error: (err as Error).message }, "SSH connection failed");
         return {
             content: [
                 {

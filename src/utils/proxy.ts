@@ -10,11 +10,8 @@ export interface ProxyResolution {
     warning?: string;
 }
 
-export function resolveProxyJump(
-    requested: string | undefined,
-    hostConfig: SSHHostConfig,
-): ProxyResolution {
-    const alias = (requested && requested.trim()) || hostConfig.proxyJump;
+export function resolveProxyJump(hostConfig: SSHHostConfig): ProxyResolution {
+    const alias = hostConfig.proxyJump;
     if (!alias) {
         return { proxyConfig: null };
     }
