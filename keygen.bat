@@ -194,8 +194,20 @@ echo.
 :: ------------------------------------------------
 echo  [3/4] Updating SSH config ...
 
+:: ──────── Pre-flight: file writability check ────────
 if not exist "%CONFIG%" (
-    type nul > "%CONFIG%"
+    (call ) >nul 2>nul
+    type nul > "%CONFIG%" 2>nul
+    if errorlevel 1 (
+        echo  [X] Cannot create config file. Possible causes:
+        echo      - .ssh folder is read-only
+        echo      - Antivirus ^(e.g. Malwarebytes^) is locking the folder
+        echo      - Path is too long or contains invalid characters
+        echo.
+        echo  Quick fix: run this as administrator, or check if
+        echo           the .ssh folder is open in another program.
+        pause & exit /b 1
+    )
     echo  [+] Config file created: %CONFIG%
 )
 
@@ -204,9 +216,12 @@ if not exist "%CONFIG%" (
 findstr /i /r /c:"^Host[ ]*!ALIAS![ ]*$" "%CONFIG%" >nul 2>nul
 if not errorlevel 1 (
     echo  [=] Alias [!ALIAS!] already exists in config, skipped.
+    echo      To update, remove it manually and re-run.
     goto :config_done
 )
 
+:: ──────── Write config block atomically ────────
+set "TMPBLOCK=%TEMP%\ssh_config_block_%RANDOM%.tmp"
 (
     echo.
     echo Host !ALIAS!
@@ -217,10 +232,32 @@ if not errorlevel 1 (
     echo     ServerAliveInterval 60
     echo     ServerAliveCountMax 3
     echo     StrictHostKeyChecking accept-new
-)>>"%CONFIG%" || (
-    echo  [X] Failed to write to: %CONFIG%
+) > "!TMPBLOCK!"
+
+if not exist "!TMPBLOCK!" (
+    echo  [X] Failed to create temporary config block.
+    echo      Disk full? %%TEMP%% = %TEMP%
     pause & exit /b 1
 )
+
+:: Append only if the full temp block was written successfully
+type "!TMPBLOCK!" >> "%CONFIG%"
+if errorlevel 1 (
+    echo  [X] Cannot append to config file.
+    echo      File locked by another process? Try closing:
+    echo        - VS Code ^(Git integrated terminal^)
+    echo        - Notepad / text editors
+    echo        - WinSCP / FileZilla / other SFTP clients
+    echo        - Git Bash / Windows Terminal
+    echo.
+    echo  If the problem persists, temporarly disable real-time
+    echo  protection in your antivirus and retry.
+    del "!TMPBLOCK!" >nul 2>nul
+    pause & exit /b 1
+)
+
+:: Cleanup temp file
+del "!TMPBLOCK!" >nul 2>nul
 
 echo  [+] Alias [!ALIAS!] added to config.
 
@@ -276,7 +313,7 @@ if "!PUBKEYLINE!"=="" (
     echo   Add your public key to the server
     echo  ================================================
     echo.
-    echo  Option A — paste this command on the server:
+    echo  Option A ^| Paste this command on the server:
     echo.
 
     :: Write the server command to a temp file to avoid echo mangling long keys
@@ -288,7 +325,7 @@ if "!PUBKEYLINE!"=="" (
     del "!TMPFILE!" >nul 2>nul
 
     echo.
-    echo  Option B — if ssh-copy-id is available ^(e.g. via Git Bash^):
+    echo  Option B ^| If ssh-copy-id is available ^(e.g. via Git Bash^):
     echo.
     echo      ssh-copy-id -i "%PUBKEY%" !SSHUSER!@!HOST! -p !PORT!
 )
@@ -308,10 +345,10 @@ powershell -NoProfile -Command "Write-Host '  WARNING: USE AT YOUR OWN RISK!' -F
 powershell -NoProfile -Command "Write-Host '  The AI agent can execute privileged commands.' -ForegroundColor Red"
 powershell -NoProfile -Command "Write-Host '  Recommended only for local/dev/homelab servers.' -ForegroundColor Yellow"
 echo.
-echo  [FULL ACCESS — easiest, least safe]
+    echo  [FULL ACCESS | easiest, least safe]
 echo  sudo bash -c "echo '!SSHUSER! ALL=(ALL) NOPASSWD: ALL' ^> /etc/sudoers.d/99-mcp-!SSHUSER!"
 echo.
-echo  [LIMITED ACCESS — safer, restrict to specific commands]
+    echo  [LIMITED ACCESS | safer, restrict to specific commands]
 echo  sudo bash -c "echo '!SSHUSER! ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /usr/bin/apt' ^> /etc/sudoers.d/99-mcp-!SSHUSER!"
 echo.
 echo  Validate after applying:
