@@ -18,6 +18,8 @@ import {
     handleReconnect,
     sendInputTool,
     handleSendInput,
+    openTerminalTool,
+    handleOpenTerminal,
     readOutputTool,
     handleReadOutput,
     execTool,
@@ -67,6 +69,7 @@ const allTools = [
     connectTool,
     reconnectTool,
     sendInputTool,
+    openTerminalTool,
     readOutputTool,
     execTool,
     interruptTool,
@@ -133,6 +136,9 @@ export function createServer(storage?: StorageManager) {
                 }
                 case "send_input": {
                     return await handleSendInput(args, sessionManager, tmuxManager);
+                }
+                case "open_terminal": {
+                    return await handleOpenTerminal(args, sessionManager);
                 }
                 case "read_output": {
                     return await handleReadOutput(args, sessionManager, tmuxManager);

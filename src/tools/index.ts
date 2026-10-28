@@ -2,6 +2,7 @@ export { listHostsTool, handleListHosts } from "./list_hosts.js";
 export { connectTool, handleConnect } from "./connect.js";
 export { reconnectTool, handleReconnect } from "./reconnect_to_tmux.js";
 export { sendInputTool, handleSendInput } from "./send_input.js";
+export { openTerminalTool, handleOpenTerminal } from "./open_terminal.js";
 export { readOutputTool, handleReadOutput } from "./read_output.js";
 export { execTool, handleExec } from "./exec.js";
 export { interruptTool, handleInterrupt } from "./interrupt.js";

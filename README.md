@@ -3,7 +3,7 @@
 <p align="left">
   <img src="https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js" alt="Node.js ≥18">
   <img src="https://img.shields.io/badge/MCP-Server-orange" alt="MCP">
-  <img src="https://img.shields.io/badge/Tools-25-blue" alt="25 tools">
+  <img src="https://img.shields.io/badge/Tools-26-blue" alt="26 tools">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey" alt="platform">
 </p>
@@ -317,10 +317,10 @@ No restart needed. Changes apply immediately.
 
 ---
 
-## Tools (25)
+## Tools (26)
 
 <details>
-<summary><b>Workspace (9 tools)</b></summary>
+<summary><b>Workspace (10 tools)</b></summary>
 
 | Tool | Description |
 |---|---|
@@ -328,6 +328,7 @@ No restart needed. Changes apply immediately.
 | `reconnect_to_tmux` | Reattach to existing workspace after disconnect |
 | `exec` | Run command, wait for prompt, return output |
 | `send_input` | Inject raw input (non-blocking) |
+| `open_terminal` | Open terminal for direct sudo authentication |
 | `read_output` | Capture pane tail |
 | `interrupt` | Ctrl-C / Ctrl-D signal |
 | `disconnect` | Close session. Optionally kill tmux or keep alive |
@@ -447,7 +448,7 @@ src/
 │   ├── StorageManager.ts       # Persistent session storage (JSON)
 │   ├── ToolConfigManager.ts    # Runtime tool enable/disable
 │   └── HostSecurityManager.ts  # Per-host security policies
-├── tools/                      # 25 MCP tool handlers
+├── tools/                      # 26 MCP tool handlers
 └── utils/                      # Security, SSH config parsing, logging, validation
 ```
 

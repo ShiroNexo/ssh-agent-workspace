@@ -1,6 +1,6 @@
 # Tool Reference
 
-Complete reference for all 25 MCP tools.
+Complete reference for all 26 MCP tools.
 
 ---
 
@@ -73,6 +73,18 @@ Send raw input into a tmux session. Preserves shell state (cwd, env, history). N
 | `input` | string | **Yes** | Raw input text |
 
 **Blocked when:** Read-only mode, per-host read-only.
+
+---
+
+### `open_terminal`
+
+Open a local Windows terminal attached to the session's tmux pane. Use it when `sudo` requires a password: run `sudo -v`, type the password directly in the terminal, then detach with `Ctrl+B`, `D`. The password never passes through MCP or the agent. Do not use `exec` while this terminal is attached.
+
+| Parameter | Type | Required |
+|---|---|---|
+| `session_id` | string | **Yes** |
+
+**Blocked when:** Read-only mode, per-host read-only. Windows only.
 
 ---
 
