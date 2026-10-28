@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
+set "EMPTY_HITS=0"
 title SSH MCP Setup
 color 07
 cls
@@ -68,23 +69,24 @@ echo  ------------------------------------------------
 set "ALIAS="
 set /p "ALIAS=  Alias (e.g. prod)      : "
 
-:: Trim leading/trailing spaces via a for loop trick
-for /f "tokens=* delims= " %%A in ("!ALIAS!") do set "ALIAS=%%A"
-
-if "!ALIAS!"=="" (
+if not defined ALIAS (
+    set /a EMPTY_HITS+=1
+    if !EMPTY_HITS! geq 3 (
+        echo.
+        echo  [X] No valid alias entered. Aborting.
+        pause
+        exit /b 1
+    )
     echo  [!] Alias cannot be empty.
     goto :ask_alias
 )
+set "EMPTY_HITS=0"
 
-:: Reject spaces inside alias
-echo !ALIAS!| find " " >nul 2>nul && (
-    echo  [!] Alias cannot contain spaces.
-    goto :ask_alias
-)
-
-:: Reject characters that break SSH config or findstr: * ? \ / " < > |
-echo !ALIAS!| findstr /r "[*?/\\\""<>|]" >nul 2>nul && (
-    echo  [!] Alias contains invalid characters.
+:: Validate via env var so input can never be parsed as cmd.exe syntax
+set "MCP_VAL=!ALIAS!"
+powershell -NoProfile -Command "if($env:MCP_VAL -notmatch '^[A-Za-z0-9_.-]+$'){exit 1}" >nul 2>nul
+if errorlevel 1 (
+    echo  [!] Alias may contain only letters, numbers, dot, underscore, and hyphen.
     goto :ask_alias
 )
 
@@ -94,15 +96,24 @@ echo !ALIAS!| findstr /r "[*?/\\\""<>|]" >nul 2>nul && (
 :ask_host
 set "HOST="
 set /p "HOST=  IP / Hostname          : "
-for /f "tokens=* delims= " %%A in ("!HOST!") do set "HOST=%%A"
 
-if "!HOST!"=="" (
+if not defined HOST (
+    set /a EMPTY_HITS+=1
+    if !EMPTY_HITS! geq 3 (
+        echo.
+        echo  [X] No valid host entered. Aborting.
+        pause
+        exit /b 1
+    )
     echo  [!] Host cannot be empty.
     goto :ask_host
 )
+set "EMPTY_HITS=0"
 
-echo !HOST!| find " " >nul 2>nul && (
-    echo  [!] Hostname cannot contain spaces.
+set "MCP_VAL=!HOST!"
+powershell -NoProfile -Command "if($env:MCP_VAL -notmatch '^[A-Za-z0-9_.:-]+$'){exit 1}" >nul 2>nul
+if errorlevel 1 (
+    echo  [!] Host may contain only letters, numbers, dot, underscore, colon, and hyphen.
     goto :ask_host
 )
 
@@ -112,15 +123,24 @@ echo !HOST!| find " " >nul 2>nul && (
 :ask_user
 set "SSHUSER="
 set /p "SSHUSER=  SSH Username           : "
-for /f "tokens=* delims= " %%A in ("!SSHUSER!") do set "SSHUSER=%%A"
 
-if "!SSHUSER!"=="" (
+if not defined SSHUSER (
+    set /a EMPTY_HITS+=1
+    if !EMPTY_HITS! geq 3 (
+        echo.
+        echo  [X] No valid username entered. Aborting.
+        pause
+        exit /b 1
+    )
     echo  [!] Username cannot be empty.
     goto :ask_user
 )
+set "EMPTY_HITS=0"
 
-echo !SSHUSER!| find " " >nul 2>nul && (
-    echo  [!] Username cannot contain spaces.
+set "MCP_VAL=!SSHUSER!"
+powershell -NoProfile -Command "if($env:MCP_VAL -notmatch '^[A-Za-z0-9_.-]+$'){exit 1}" >nul 2>nul
+if errorlevel 1 (
+    echo  [!] Username may contain only letters, numbers, dot, underscore, and hyphen.
     goto :ask_user
 )
 
@@ -130,18 +150,16 @@ echo !SSHUSER!| find " " >nul 2>nul && (
 :ask_port
 set "PORT="
 set /p "PORT=  SSH Port [default 22]  : "
-for /f "tokens=* delims= " %%A in ("!PORT!") do set "PORT=%%A"
 
 if "!PORT!"=="" set "PORT=22"
 
-:: Use PowerShell to safely validate numeric range (avoids batch integer parsing bugs)
-powershell -NoProfile -Command ^
-    "param([string]$p) $n=0; if(-not[int]::TryParse($p,[ref]$n)-or $n -lt 1 -or $n -gt 65535){exit 1}" ^
-    -p "!PORT!" >nul 2>nul
+:: Validate via env var so input can never be parsed as cmd.exe syntax
+set "MCP_VAL=!PORT!"
+powershell -NoProfile -Command "$n=0; if(-not[int]::TryParse($env:MCP_VAL,[ref]$n)-or $n -lt 1 -or $n -gt 65535){exit 1}" >nul 2>nul
 
 if errorlevel 1 (
-    echo  [!] Invalid port. Must be a number between 1 and 65535. Using 22.
-    set "PORT=22"
+    echo  [!] Invalid port. Enter a number between 1 and 65535.
+    goto :ask_port
 )
 
 echo.
@@ -174,7 +192,8 @@ if not exist "%PRIVKEY%" (
     )
     "!SSHKEYGEN!" -t ed25519 -f "%PRIVKEY%" -N "" -C "mcp-!ALIAS!"
     if errorlevel 1 (
-        echo  [X] ssh-keygen failed.
+        echo  [X] ssh-keygen failed. Removing incomplete key files.
+        del "%PRIVKEY%" "%PUBKEY%" >nul 2>nul
         pause & exit /b 1
     )
     echo  [+] Key saved: %PRIVKEY%
@@ -196,7 +215,6 @@ echo  [3/4] Updating SSH config ...
 
 :: ──────── Pre-flight: file writability check ────────
 if not exist "%CONFIG%" (
-    (call ) >nul 2>nul
     type nul > "%CONFIG%" 2>nul
     if errorlevel 1 (
         echo  [X] Cannot create config file. Possible causes:
@@ -345,10 +363,10 @@ powershell -NoProfile -Command "Write-Host '  WARNING: USE AT YOUR OWN RISK!' -F
 powershell -NoProfile -Command "Write-Host '  The AI agent can execute privileged commands.' -ForegroundColor Red"
 powershell -NoProfile -Command "Write-Host '  Recommended only for local/dev/homelab servers.' -ForegroundColor Yellow"
 echo.
-    echo  [FULL ACCESS | easiest, least safe]
+echo  [FULL ACCESS ^| easiest, least safe]
 echo  sudo bash -c "echo '!SSHUSER! ALL=(ALL) NOPASSWD: ALL' ^> /etc/sudoers.d/99-mcp-!SSHUSER!"
 echo.
-    echo  [LIMITED ACCESS | safer, restrict to specific commands]
+echo  [LIMITED ACCESS ^| safer, restrict to specific commands]
 echo  sudo bash -c "echo '!SSHUSER! ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /usr/bin/apt' ^> /etc/sudoers.d/99-mcp-!SSHUSER!"
 echo.
 echo  Validate after applying:
